@@ -19,7 +19,10 @@ class TaskService {
     final today = DateTime(now.year, now.month, now.day);
     
     return _tasks.where((task) {
-      if (task.dueDate == null) return false;
+      // Show tasks with no due date (default to today)
+      if (task.dueDate == null) return true;
+      
+      // Show tasks due today
       final dueDate = DateTime(
         task.dueDate!.year,
         task.dueDate!.month,
