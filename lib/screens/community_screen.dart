@@ -1,7 +1,27 @@
 import 'package:flutter/material.dart';
 
-class CommunityScreen extends StatelessWidget {
+class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
+
+  @override
+  State<CommunityScreen> createState() => _CommunityScreenState();
+}
+
+class _CommunityScreenState extends State<CommunityScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -10,8 +30,30 @@ class CommunityScreen extends StatelessWidget {
         title: const Text('Community', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          tabs: const [
+            Tab(
+              icon: Icon(Icons.leaderboard),
+              text: 'Leaderboard',
+            ),
+            Tab(
+              icon: Icon(Icons.auto_awesome),
+              text: 'AI Assistant',
+            ),
+          ],
+        ),
       ),
-      body: _buildLeaderboard(),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildLeaderboard(),
+          _buildAIAssistant(),
+        ],
+      ),
     );
   }
 
@@ -148,5 +190,96 @@ class CommunityScreen extends StatelessWidget {
       default:
         return Colors.blue;
     }
+  }
+
+  Widget _buildAIAssistant() {
+    return Container(
+      color: Colors.grey.shade50,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.auto_awesome,
+                  size: 64,
+                  color: Colors.blue.shade400,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'AI Assistant',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Your personal productivity companion',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey.shade600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildFeatureItem(Icons.lightbulb_outline, 'Smart task suggestions'),
+                      const SizedBox(height: 12),
+                      _buildFeatureItem(Icons.schedule, 'Schedule optimization'),
+                      const SizedBox(height: 12),
+                      _buildFeatureItem(Icons.chat_bubble_outline, 'Chat assistance'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Coming Soon!',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureItem(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.blue),
+        const SizedBox(width: 12),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 14),
+        ),
+      ],
+    );
   }
 }
