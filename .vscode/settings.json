@@ -1,0 +1,5 @@
+{
+    "files.exclude": {
+        "**/timetable_remainder_application": true
+    }
+}

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
+import 'task_form_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -9,29 +11,20 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final TaskProvider _taskProvider = TaskProvider();
-
   @override
   void initState() {
     super.initState();
-    _taskProvider.loadTasks();
-    _taskProvider.addListener(_onTasksChanged);
-  }
-
-  @override
-  void dispose() {
-    _taskProvider.removeListener(_onTasksChanged);
-    super.dispose();
-  }
-
-  void _onTasksChanged() {
-    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<TaskProvider>(context, listen: false).loadTasks();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
+    return Consumer<TaskProvider>(
+      builder: (context, taskProvider, child) {
+        return Scaffold(
+          appBar: AppBar(
         title: const Text('TaskCue'),
         actions: [
           IconButton(
@@ -62,42 +55,41 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await _taskProvider.refresh();
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome Section
-              _buildWelcomeSection(),
-              
-              const SizedBox(height: 20),
-              
-              // Stats Section
-              _buildStatsSection(),
-              
-              const SizedBox(height: 20),
-              
-              // Today's Tasks
-              _buildTodayTasksSection(),
-              
-              const SizedBox(height: 20),
-            ],
+          body: RefreshIndicator(
+            onRefresh: () async {
+              await taskProvider.refresh();
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildWelcomeSection(),
+                  const SizedBox(height: 20),
+                  _buildStatsSection(taskProvider),
+                  const SizedBox(height: 20),
+                  _buildTodayTasksSection(taskProvider),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Add task feature coming soon!')),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Add Task'),
-      ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () async {
+              final result = await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => TaskFormScreen(taskProvider: taskProvider),
+                ),
+              );
+              if (result == true) {
+                taskProvider.refresh();
+              }
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Add Task'),
+          ),
+        );
+      },
     );
   }
 
@@ -181,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatsSection() {
+  Widget _buildStatsSection(TaskProvider taskProvider) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -189,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: _buildStatCard(
               'Completed',
-              _taskProvider.completedCount.toString(),
+              taskProvider.completedCount.toString(),
               Icons.check_circle,
               Colors.green,
             ),
@@ -198,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: _buildStatCard(
               'Pending',
-              _taskProvider.pendingCount.toString(),
+              taskProvider.pendingCount.toString(),
               Icons.pending_actions,
               Colors.orange,
             ),
@@ -207,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: _buildStatCard(
               'Overdue',
-              _taskProvider.overdueCount.toString(),
+              taskProvider.overdueCount.toString(),
               Icons.warning,
               Colors.red,
             ),
@@ -250,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTodayTasksSection() {
+  Widget _buildTodayTasksSection(TaskProvider taskProvider) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -277,19 +269,19 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _taskProvider.isLoading
+          taskProvider.isLoading
               ? const Center(child: CircularProgressIndicator())
-              : _taskProvider.todayTasks.isEmpty
+              : taskProvider.todayTasks.isEmpty
                   ? _buildEmptyState()
-                  : _buildTaskList(),
+                  : _buildTaskList(taskProvider),
         ],
       ),
     );
   }
 
-  Widget _buildTaskList() {
+  Widget _buildTaskList(TaskProvider taskProvider) {
     return Column(
-      children: _taskProvider.todayTasks.map((task) {
+      children: taskProvider.todayTasks.map((task) {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
@@ -309,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
               value: task.isCompleted,
               onChanged: (value) {
                 if (value == true) {
-                  _taskProvider.completeTask(task.id);
+                  taskProvider.completeTask(task.id);
                 }
               },
             ),
@@ -335,7 +327,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   icon: const Icon(Icons.delete_outline, size: 20),
                   onPressed: () {
-                    _taskProvider.deleteTask(task.id);
+                    taskProvider.deleteTask(task.id);
                   },
                 ),
               ],
