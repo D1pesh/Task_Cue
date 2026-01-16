@@ -90,7 +90,23 @@ class _TasksListScreenState extends State<TasksListScreen> {
                         itemCount: filteredTasks.length,
                         itemBuilder: (context, index) {
                           final task = filteredTasks[index];
-                          return _buildTaskCard(task, taskProvider);
+                          return Dismissible(
+                            key: Key(task.id),
+                            background: Container(
+                              color: Colors.red,
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              child: const Icon(Icons.delete, color: Colors.white),
+                            ),
+                            direction: DismissDirection.endToStart,
+                            onDismissed: (_) {
+                              taskProvider.deleteTask(task.id);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('"${task.title}" deleted')),
+                              );
+                            },
+                            child: _buildTaskCard(task, taskProvider),
+                          );
                         },
                       ),
               ),
