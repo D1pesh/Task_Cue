@@ -99,11 +99,12 @@ class _TasksListScreenState extends State<TasksListScreen> {
                               child: const Icon(Icons.delete, color: Colors.white),
                             ),
                             direction: DismissDirection.endToStart,
-                            onDismissed: (_) {
-                              taskProvider.deleteTask(task.id);
+                            confirmDismiss: (_) async {
+                              await taskProvider.deleteTask(task.id);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text('"${task.title}" deleted')),
                               );
+                              return true;
                             },
                             child: _buildTaskCard(task, taskProvider),
                           );

@@ -280,61 +280,101 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTaskList(TaskProvider taskProvider) {
+    // Separate and sort tasks
+    final activeTasks = taskProvider.todayTasks.where((t) => !t.isCompleted).toList();
+    final completedTasks = taskProvider.todayTasks.where((t) => t.isCompleted).toList();
+    
     return Column(
-      children: taskProvider.todayTasks.map((task) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withValues(alpha: 0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Active Tasks Section
+        if (activeTasks.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Active (${activeTasks.length})',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade700,
               ),
-            ],
+            ),
           ),
-          child: ListTile(
-            leading: Checkbox(
-              value: task.isCompleted,
-              onChanged: (value) {
-                if (value == true) {
-                  taskProvider.completeTask(task.id);
-                }
+          ...activeTasks.map((task) => _buildTaskCard(task, taskProvider, false)),
+        ],
+        
+        // Completed Tasks Section
+        if (completedTasks.isNotEmpty) ...[
+          if (activeTasks.isNotEmpty) const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Completed (${completedTasks.length})',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ),
+          ...completedTasks.map((task) => _buildTaskCard(task, taskProvider, true)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildTaskCard(task, TaskProvider taskProvider, bool isCompleted) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isCompleted ? Colors.green.shade50 : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isCompleted ? Colors.green.shade200 : Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: Checkbox(
+          value: task.isCompleted,
+          onChanged: (value) {
+            if (value == true) {
+              taskProvider.completeTask(task.id);
+            }
+          },
+        ),
+        title: Text(
+          task.title,
+          style: TextStyle(
+            decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        subtitle: task.description != null
+            ? Text(
+                task.description!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )
+            : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (task.isOverdue)
+              const Icon(Icons.warning, color: Colors.red, size: 20),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 20),
+              onPressed: () {
+                taskProvider.deleteTask(task.id);
               },
             ),
-            title: Text(
-              task.title,
-              style: TextStyle(
-                decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            subtitle: task.description != null
-                ? Text(
-                    task.description!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  )
-                : null,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (task.isOverdue)
-                  const Icon(Icons.warning, color: Colors.red, size: 20),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 20),
-                  onPressed: () {
-                    taskProvider.deleteTask(task.id);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
+          ],
+        ),
+      ),
     );
   }
 
