@@ -27,39 +27,124 @@ class HeatmapWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    // Show last 35 days (5 weeks)
-    final startDate = DateTime(now.year, now.month, now.day)
-        .subtract(const Duration(days: 34));
+    final firstDayOfMonth = DateTime(now.year, now.month, 1);
+    final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
+    final daysInMonth = lastDayOfMonth.day;
+    
+    // Calculate padding (0=Sunday, 1=Monday, etc.)
+    final startWeekday = firstDayOfMonth.weekday % 7;
+    final totalCells = startWeekday + daysInMonth;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Grid of days
+        // Month name
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            _getMonthName(now.month),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        
+        // Weekday headers
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+                .map((day) => SizedBox(
+                      width: 32,
+                      child: Text(
+                        day,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ))
+                .toList(),
+          ),
+        ),
+        
+        // Calendar grid
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 7,
-            mainAxisSpacing: 4,
-            crossAxisSpacing: 4,
+            mainAxisSpacing: 3,
+            crossAxisSpacing: 3,
             childAspectRatio: 1.0,
           ),
-          itemCount: 35,
+          itemCount: totalCells,
           itemBuilder: (context, index) {
-            final date = startDate.add(Duration(days: index));
+            // Empty cells before month starts
+            if (index < startWeekday) {
+              return const SizedBox();
+            }
+            
+            final dayNumber = index - startWeekday + 1;
+            final date = DateTime(now.year, now.month, dayNumber);
             final dateKey = DateTime(date.year, date.month, date.day);
             final points = dailyPoints[dateKey] ?? 0.0;
+            final isSelected = selectedDate != null &&
+                selectedDate!.year == date.year &&
+                selectedDate!.month == date.month &&
+                selectedDate!.day == date.day;
+            final isToday = date.year == now.year &&
+                date.month == now.month &&
+                date.day == now.day;
+            final isFuture = date.isAfter(now);
             
-            return Container(
-              decoration: BoxDecoration(
-                color: _getColorForPoints(points),
-                borderRadius: BorderRadius.circular(4),
+            return GestureDetector(
+              onTap: isFuture ? null : () => onDateTap?.call(date),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isFuture ? Colors.grey.shade100 : _getColorForPoints(points),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: isSelected
+                        ? Colors.blue
+                        : isToday
+                            ? Colors.blue.withValues(alpha: 0.5)
+                            : Colors.transparent,
+                    width: isSelected ? 2 : isToday ? 1.5 : 0,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    '$dayNumber',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+                      color: isFuture
+                          ? Colors.grey.shade400
+                          : points > 100
+                              ? Colors.white
+                              : Colors.grey.shade800,
+                    ),
+                  ),
+                ),
               ),
             );
           },
         ),
       ],
     );
+  }
+  
+  String _getMonthName(int month) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[month - 1];
   }
 }
