@@ -14,8 +14,8 @@ class HeatmapWidget extends StatelessWidget {
   });
   
   /// Get color intensity based on points earned
-  Color _getColorForPoints(double points) {
-    if (points == 0) return Colors.grey.shade200;
+  Color _getColorForPoints(double points, bool isDark) {
+    if (points == 0) return isDark ? Colors.grey.shade800 : Colors.grey.shade200;
     if (points < 30) return const Color(0xFFDCFCE7); // Very light green
     if (points < 60) return const Color(0xFFA7F3D0); // Light green
     if (points < 100) return const Color(0xFF6EE7B7); // Medium green
@@ -26,6 +26,7 @@ class HeatmapWidget extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final now = DateTime.now();
     final firstDayOfMonth = DateTime(now.year, now.month, 1);
     final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
@@ -107,7 +108,9 @@ class HeatmapWidget extends StatelessWidget {
               onTap: isFuture ? null : () => onDateTap?.call(date),
               child: Container(
                 decoration: BoxDecoration(
-                  color: isFuture ? Colors.grey.shade100 : _getColorForPoints(points),
+                  color: isFuture 
+                      ? (isDark ? Colors.grey.shade900 : Colors.grey.shade100)
+                      : _getColorForPoints(points, isDark),
                   borderRadius: BorderRadius.circular(4),
                   border: Border.all(
                     color: isSelected
@@ -125,16 +128,59 @@ class HeatmapWidget extends StatelessWidget {
                       fontSize: 10,
                       fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
                       color: isFuture
-                          ? Colors.grey.shade400
+                          ? (isDark ? Colors.grey.shade600 : Colors.grey.shade400)
                           : points > 100
                               ? Colors.white
-                              : Colors.grey.shade800,
+                              : (isDark ? Colors.white70 : Colors.grey.shade800),
                     ),
                   ),
                 ),
               ),
             );
           },
+        ),
+        
+        const SizedBox(height: 12),
+        
+        // Legend
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Less',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(width: 8),
+            ...List.generate(5, (index) {
+              final points = index * 50.0;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: _getColorForPoints(points, isDark),
+                    borderRadius: BorderRadius.circular(3),
+                    border: Border.all(
+                      color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                      width: 0.5,
+                    ),
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(width: 8),
+            Text(
+              'More',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
+            ),
+          ],
         ),
       ],
     );
