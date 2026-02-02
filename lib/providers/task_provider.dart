@@ -49,6 +49,9 @@ class TaskProvider extends ChangeNotifier {
     required int priority,
     DateTime? dueDate,
     int? estimatedMinutes,
+    String? scheduleType,
+    String? scheduledTime,
+    List<int>? scheduledDays,
   }) async {
     try {
       _isLoading = true;
@@ -62,6 +65,9 @@ class TaskProvider extends ChangeNotifier {
         priority: priority,
         dueDate: dueDate,
         estimatedMinutes: estimatedMinutes,
+        scheduleType: scheduleType,
+        scheduledTime: scheduledTime,
+        scheduledDays: scheduledDays,
       );
       
       await loadTasks();

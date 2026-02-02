@@ -50,6 +50,9 @@ class TaskService {
     required int priority,
     DateTime? dueDate,
     int? estimatedMinutes,
+    String? scheduleType,
+    String? scheduledTime,
+    List<int>? scheduledDays,
   }) async {
     await Future.delayed(const Duration(milliseconds: 500)); // Simulate API delay
     
@@ -63,6 +66,9 @@ class TaskService {
       estimatedMinutes: estimatedMinutes,
       status: 'pending',
       createdAt: DateTime.now(),
+      scheduleType: scheduleType,
+      scheduledTime: scheduledTime,
+      scheduledDays: scheduledDays,
     );
     
     _tasks.add(task);

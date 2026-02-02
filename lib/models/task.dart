@@ -9,6 +9,11 @@ class Task {
   final String status; // 'pending', 'completed', 'overdue'
   final DateTime createdAt;
   final DateTime? completedAt;
+  
+  // Recurring task fields
+  final String? scheduleType; // 'one-time', 'daily', 'weekly'
+  final String? scheduledTime; // Format: 'HH:mm'
+  final List<int>? scheduledDays; // 1=Mon, 2=Tue, ..., 7=Sun
 
   Task({
     required this.id,
@@ -21,6 +26,9 @@ class Task {
     this.status = 'pending',
     required this.createdAt,
     this.completedAt,
+    this.scheduleType,
+    this.scheduledTime,
+    this.scheduledDays,
   });
 
   // Check if task is overdue
@@ -44,6 +52,9 @@ class Task {
     String? status,
     DateTime? createdAt,
     DateTime? completedAt,
+    String? scheduleType,
+    String? scheduledTime,
+    List<int>? scheduledDays,
   }) {
     return Task(
       id: id ?? this.id,
@@ -56,6 +67,9 @@ class Task {
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       completedAt: completedAt ?? this.completedAt,
+      scheduleType: scheduleType ?? this.scheduleType,
+      scheduledTime: scheduledTime ?? this.scheduledTime,
+      scheduledDays: scheduledDays ?? this.scheduledDays,
     );
   }
 
@@ -72,6 +86,9 @@ class Task {
       'status': status,
       'createdAt': createdAt.toIso8601String(),
       'completedAt': completedAt?.toIso8601String(),
+      'scheduleType': scheduleType,
+      'scheduledTime': scheduledTime,
+      'scheduledDays': scheduledDays,
     };
   }
 
@@ -88,6 +105,11 @@ class Task {
       status: json['status'] ?? 'pending',
       createdAt: DateTime.parse(json['createdAt']),
       completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt']) : null,
+      scheduleType: json['scheduleType'],
+      scheduledTime: json['scheduledTime'],
+      scheduledDays: json['scheduledDays'] != null 
+          ? List<int>.from(json['scheduledDays']) 
+          : null,
     );
   }
 }

@@ -22,6 +22,11 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   TimeOfDay? _selectedTime;
   bool _isLoading = false;
   
+  // Recurring task fields
+  String _scheduleType = 'one-time'; // 'one-time', 'daily', 'weekly'
+  TimeOfDay? _scheduledTime;
+  List<int> _scheduledDays = []; // 1=Monday, 7=Sunday
+  
   final List<String> _categories = [
     'Intellectual',
     'Physical Health',
@@ -63,6 +68,17 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     }
   }
   
+  Future<void> _selectScheduledTime() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _scheduledTime ?? TimeOfDay.now(),
+    );
+    
+    if (time != null) {
+      setState(() => _scheduledTime = time);
+    }
+  }
+  
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
     
@@ -80,6 +96,12 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       );
     }
     
+    // Format scheduled time for recurring tasks
+    String? formattedScheduledTime;
+    if (_scheduleType != 'one-time' && _scheduledTime != null) {
+      formattedScheduledTime = '${_scheduledTime!.hour.toString().padLeft(2, '0')}:${_scheduledTime!.minute.toString().padLeft(2, '0')}';
+    }
+    
     final success = await widget.taskProvider.createTask(
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim().isEmpty 
@@ -89,6 +111,11 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       priority: _selectedPriority,
       dueDate: finalDueDate,
       estimatedMinutes: _estimatedMinutes,
+      scheduleType: _scheduleType != 'one-time' ? _scheduleType : null,
+      scheduledTime: formattedScheduledTime,
+      scheduledDays: _scheduleType == 'weekly' && _scheduledDays.isNotEmpty 
+          ? _scheduledDays 
+          : null,
     );
     
     if (!mounted) return;
@@ -429,6 +456,137 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               ),
             ),
             
+            const SizedBox(height: 20),
+            
+            // Recurring Schedule Section
+            _buildSectionCard(
+              title: 'Recurring Schedule',
+              icon: Icons.repeat,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Schedule Type Selector
+                  Row(
+                    children: [
+                      _buildScheduleTypeChip('One-time', 'one-time'),
+                      const SizedBox(width: 8),
+                      _buildScheduleTypeChip('Daily', 'daily'),
+                      const SizedBox(width: 8),
+                      _buildScheduleTypeChip('Weekly', 'weekly'),
+                    ],
+                  ),
+                  
+                  // Show scheduled time picker for recurring tasks
+                  if (_scheduleType != 'one-time') ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Scheduled Time',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _selectScheduledTime,
+                        icon: Icon(
+                          Icons.schedule,
+                          color: _scheduledTime != null ? Colors.blue : null,
+                        ),
+                        label: Text(
+                          _scheduledTime == null
+                              ? 'Set Recurring Time'
+                              : _scheduledTime!.format(context),
+                          style: TextStyle(
+                            color: _scheduledTime != null ? Colors.blue : null,
+                            fontWeight: _scheduledTime != null ? FontWeight.bold : null,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.all(16),
+                          backgroundColor: _scheduledTime != null 
+                              ? Colors.blue.withValues(alpha: 0.1) 
+                              : null,
+                          side: BorderSide(
+                            color: _scheduledTime != null 
+                                ? Colors.blue 
+                                : Colors.grey.shade300,
+                            width: _scheduledTime != null ? 2 : 1,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  
+                  // Show day selector for weekly tasks
+                  if (_scheduleType == 'weekly') ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Select Days',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildDayChip('Mon', 1),
+                        _buildDayChip('Tue', 2),
+                        _buildDayChip('Wed', 3),
+                        _buildDayChip('Thu', 4),
+                        _buildDayChip('Fri', 5),
+                        _buildDayChip('Sat', 6),
+                        _buildDayChip('Sun', 7),
+                      ],
+                    ),
+                  ],
+                  
+                  // Info message
+                  if (_scheduleType != 'one-time')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.green.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline, size: 18, color: Colors.green),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _scheduleType == 'daily'
+                                    ? 'Task will repeat daily at the scheduled time'
+                                    : 'Task will repeat on selected days at the scheduled time',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.green.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            
             const SizedBox(height: 32),
             
             // Submit Button
@@ -493,6 +651,76 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     final month = date.month.toString().padLeft(2, '0');
     final day = date.day.toString().padLeft(2, '0');
     return '${date.year}-$month-$day';
+  }
+  
+  Widget _buildScheduleTypeChip(String label, String value) {
+    final isSelected = _scheduleType == value;
+    return Expanded(
+      child: ChoiceChip(
+        label: SizedBox(
+          width: double.infinity,
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+        selected: isSelected,
+        onSelected: _isLoading ? null : (selected) {
+          if (selected) {
+            setState(() {
+              _scheduleType = value;
+              if (value == 'one-time') {
+                _scheduledTime = null;
+                _scheduledDays.clear();
+              }
+            });
+          }
+        },
+        selectedColor: Colors.blue,
+        backgroundColor: Colors.grey.shade200,
+        labelStyle: TextStyle(
+          color: isSelected ? Colors.white : Colors.black87,
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildDayChip(String label, int day) {
+    final isSelected = _scheduledDays.contains(day);
+    return FilterChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      selected: isSelected,
+      onSelected: _isLoading ? null : (selected) {
+        setState(() {
+          if (selected) {
+            _scheduledDays.add(day);
+          } else {
+            _scheduledDays.remove(day);
+          }
+        });
+      },
+      selectedColor: Colors.blue,
+      backgroundColor: Colors.grey.shade200,
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : Colors.black87,
+      ),
+      checkmarkColor: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    );
   }
   
   Widget _buildCard({required Widget child}) {
