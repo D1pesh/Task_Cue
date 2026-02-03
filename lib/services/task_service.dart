@@ -87,6 +87,9 @@ class TaskService {
     DateTime? dueDate,
     int? estimatedMinutes,
     String? status,
+    String? scheduleType,
+    String? scheduledTime,
+    List<int>? scheduledDays,
   }) async {
     await Future.delayed(const Duration(milliseconds: 500));
     
@@ -104,6 +107,9 @@ class TaskService {
       dueDate: dueDate,
       estimatedMinutes: estimatedMinutes,
       status: status,
+      scheduleType: scheduleType,
+      scheduledTime: scheduledTime,
+      scheduledDays: scheduledDays,
     );
     
     _tasks[index] = updatedTask;

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../providers/task_provider.dart';
+import '../models/task.dart';
 
 class TaskFormScreen extends StatefulWidget {
   final TaskProvider taskProvider;
+  final Task? initialTask;
   
-  const TaskFormScreen({super.key, required this.taskProvider});
+  const TaskFormScreen({super.key, required this.taskProvider, this.initialTask});
 
   @override
   State<TaskFormScreen> createState() => _TaskFormScreenState();
@@ -36,6 +38,31 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     'Hobbies/Passion',
     'Financial',
   ];
+  
+  @override
+  void initState() {
+    super.initState();
+    // Prefill when editing an existing task
+    final t = widget.initialTask;
+    if (t != null) {
+      _titleController.text = t.title;
+      _descriptionController.text = t.description ?? '';
+      _selectedCategory = t.category;
+      _selectedPriority = t.priority;
+      _estimatedMinutes = t.estimatedMinutes ?? _estimatedMinutes;
+      _selectedDueDate = t.dueDate;
+      if (t.scheduledTime != null) {
+        final parts = t.scheduledTime!.split(':');
+        if (parts.length >= 2) {
+          final h = int.tryParse(parts[0]) ?? 0;
+          final m = int.tryParse(parts[1]) ?? 0;
+          _scheduledTime = TimeOfDay(hour: h, minute: m);
+        }
+      }
+      _scheduleType = t.scheduleType ?? 'one-time';
+      _scheduledDays = List<int>.from(t.scheduledDays ?? []);
+    }
+  }
   
   @override
   void dispose() {
@@ -102,21 +129,42 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       formattedScheduledTime = '${_scheduledTime!.hour.toString().padLeft(2, '0')}:${_scheduledTime!.minute.toString().padLeft(2, '0')}';
     }
     
-    final success = await widget.taskProvider.createTask(
-      title: _titleController.text.trim(),
-      description: _descriptionController.text.trim().isEmpty 
-          ? null 
-          : _descriptionController.text.trim(),
-      category: _selectedCategory,
-      priority: _selectedPriority,
-      dueDate: finalDueDate,
-      estimatedMinutes: _estimatedMinutes,
-      scheduleType: _scheduleType != 'one-time' ? _scheduleType : null,
-      scheduledTime: formattedScheduledTime,
-      scheduledDays: _scheduleType == 'weekly' && _scheduledDays.isNotEmpty 
-          ? _scheduledDays 
-          : null,
-    );
+    bool success = false;
+    if (widget.initialTask == null) {
+      success = await widget.taskProvider.createTask(
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim().isEmpty 
+            ? null 
+            : _descriptionController.text.trim(),
+        category: _selectedCategory,
+        priority: _selectedPriority,
+        dueDate: finalDueDate,
+        estimatedMinutes: _estimatedMinutes,
+        scheduleType: _scheduleType != 'one-time' ? _scheduleType : null,
+        scheduledTime: formattedScheduledTime,
+        scheduledDays: _scheduleType == 'weekly' && _scheduledDays.isNotEmpty 
+            ? _scheduledDays 
+            : null,
+      );
+    } else {
+      // Update existing task
+      success = await widget.taskProvider.updateTask(
+        widget.initialTask!.id,
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim().isEmpty 
+            ? null 
+            : _descriptionController.text.trim(),
+        category: _selectedCategory,
+        priority: _selectedPriority,
+        dueDate: finalDueDate,
+        estimatedMinutes: _estimatedMinutes,
+        scheduleType: _scheduleType != 'one-time' ? _scheduleType : null,
+        scheduledTime: formattedScheduledTime,
+        scheduledDays: _scheduleType == 'weekly' && _scheduledDays.isNotEmpty 
+            ? _scheduledDays 
+            : null,
+      );
+    }
     
     if (!mounted) return;
     
@@ -125,8 +173,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     if (success) {
       Navigator.of(context).pop(true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✓ Task added successfully!'),
+        SnackBar(
+          content: Text(widget.initialTask == null ? '✓ Task added successfully!' : '✓ Task updated successfully!'),
           backgroundColor: Colors.green,
         ),
       );
@@ -145,7 +193,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Add Task', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(widget.initialTask != null ? 'Edit Task' : 'Add Task', style: const TextStyle(fontWeight: FontWeight.bold)),
         elevation: 0,
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
@@ -156,9 +204,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           padding: const EdgeInsets.all(20),
           children: [
             // Header Section
-            const Text(
-              'Create a New Task',
-              style: TextStyle(
+            Text(
+              widget.initialTask != null ? 'Edit Task' : 'Create a New Task',
+              style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
@@ -166,7 +214,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Fill in the details below to add your task',
+              widget.initialTask != null ? 'Update fields to edit the task' : 'Fill in the details below to add your task',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade600,
@@ -624,14 +672,14 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
-                    : const Row(
+                    : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.add_circle_outline, size: 24),
-                          SizedBox(width: 8),
+                          Icon(widget.initialTask == null ? Icons.add_circle_outline : Icons.edit, size: 24),
+                          const SizedBox(width: 8),
                           Text(
-                            'Create Task',
-                            style: TextStyle(
+                            widget.initialTask == null ? 'Create Task' : 'Update Task',
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
