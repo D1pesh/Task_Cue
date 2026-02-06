@@ -206,7 +206,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               final prefs = await SharedPreferences.getInstance();
               await prefs.clear();
               await _load();
-              if (context.mounted) {
+              if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Cleared local data')),
                 );

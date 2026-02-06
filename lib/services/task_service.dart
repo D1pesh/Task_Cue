@@ -17,18 +17,33 @@ class TaskService {
     await Future.delayed(const Duration(milliseconds: 300));
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final currentWeekday = now.weekday; // 1=Mon, 2=Tue, ..., 7=Sun
     
     return _tasks.where((task) {
-      // Show tasks with no due date (default to today)
-      if (task.dueDate == null) return true;
+      // For recurring tasks
+      if (task.scheduleType == 'daily') {
+        return true; // Daily tasks show every day
+      }
       
-      // Show tasks due today
-      final dueDate = DateTime(
-        task.dueDate!.year,
-        task.dueDate!.month,
-        task.dueDate!.day,
-      );
-      return dueDate == today;
+      if (task.scheduleType == 'weekly' && task.scheduledDays != null) {
+        return task.scheduledDays!.contains(currentWeekday);
+      }
+      
+      // For one-time tasks or tasks with due dates
+      if (task.scheduleType == 'one-time' || task.scheduleType == null) {
+        // Show tasks with no due date (default to today)
+        if (task.dueDate == null) return true;
+        
+        // Show tasks due today
+        final dueDate = DateTime(
+          task.dueDate!.year,
+          task.dueDate!.month,
+          task.dueDate!.day,
+        );
+        return dueDate == today;
+      }
+      
+      return false;
     }).toList();
   }
 
