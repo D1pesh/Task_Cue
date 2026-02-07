@@ -1,4 +1,5 @@
 import '../models/task.dart';
+import 'notification_service.dart';
 
 /// Simple in-memory Task Service with CRUD operations
 class TaskService {
@@ -29,18 +30,30 @@ class TaskService {
         return task.scheduledDays!.contains(currentWeekday);
       }
       
-      // For one-time tasks or tasks with due dates
+      // For one-time tasks
       if (task.scheduleType == 'one-time' || task.scheduleType == null) {
-        // Show tasks with no due date (default to today)
-        if (task.dueDate == null) return true;
+        // Prioritize scheduledDateTime if available
+        if (task.scheduledDateTime != null) {
+          final scheduledDate = DateTime(
+            task.scheduledDateTime!.year,
+            task.scheduledDateTime!.month,
+            task.scheduledDateTime!.day,
+          );
+          return scheduledDate == today;
+        }
         
-        // Show tasks due today
-        final dueDate = DateTime(
-          task.dueDate!.year,
-          task.dueDate!.month,
-          task.dueDate!.day,
-        );
-        return dueDate == today;
+        // Fall back to deadline if no scheduled date
+        if (task.deadline != null) {
+          final deadlineDate = DateTime(
+            task.deadline!.year,
+            task.deadline!.month,
+            task.deadline!.day,
+          );
+          return deadlineDate == today;
+        }
+        
+        // Show tasks with no dates (default to today)
+        return task.deadline == null && task.scheduledDateTime == null;
       }
       
       return false;
@@ -63,7 +76,8 @@ class TaskService {
     String? description,
     required String category,
     required int priority,
-    DateTime? dueDate,
+    DateTime? deadline,
+    DateTime? scheduledDateTime,
     int? estimatedMinutes,
     String? scheduleType,
     String? scheduledTime,
@@ -77,7 +91,8 @@ class TaskService {
       description: description,
       category: category,
       priority: priority,
-      dueDate: dueDate,
+      deadline: deadline,
+      scheduledDateTime: scheduledDateTime,
       estimatedMinutes: estimatedMinutes,
       status: 'pending',
       createdAt: DateTime.now(),
@@ -89,6 +104,11 @@ class TaskService {
     _tasks.add(task);
     _nextId++;
     
+    // Schedule notification if task has scheduled time
+    if (task.scheduledDateTime != null) {
+      NotificationService.scheduleTaskReminder(task);
+    }
+    
     return task;
   }
 
@@ -99,7 +119,8 @@ class TaskService {
     String? description,
     String? category,
     int? priority,
-    DateTime? dueDate,
+    DateTime? deadline,
+    DateTime? scheduledDateTime,
     int? estimatedMinutes,
     String? status,
     String? scheduleType,
@@ -119,7 +140,8 @@ class TaskService {
       description: description,
       category: category,
       priority: priority,
-      dueDate: dueDate,
+      deadline: deadline,
+      scheduledDateTime: scheduledDateTime,
       estimatedMinutes: estimatedMinutes,
       status: status,
       scheduleType: scheduleType,
@@ -128,12 +150,31 @@ class TaskService {
     );
     
     _tasks[index] = updatedTask;
+    
+    // Handle notification scheduling for updated task
+    if (updatedTask.scheduledDateTime != oldTask.scheduledDateTime) {
+      // Cancel old notification
+      await NotificationService.cancelTaskNotification(oldTask);
+      
+      // Schedule new notification if task has scheduled time
+      if (updatedTask.scheduledDateTime != null) {
+        NotificationService.scheduleTaskReminder(updatedTask);
+      }
+    }
+    
     return updatedTask;
   }
 
   /// Delete task
   Future<void> deleteTask(String id) async {
     await Future.delayed(const Duration(milliseconds: 300));
+    
+    // Find task before deleting to cancel notification
+    final task = _tasks.where((t) => t.id == id).firstOrNull;
+    if (task != null) {
+      await NotificationService.cancelTaskNotification(task);
+    }
+    
     _tasks.removeWhere((task) => task.id == id);
   }
 

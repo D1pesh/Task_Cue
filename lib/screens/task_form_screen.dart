@@ -20,13 +20,17 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   String _selectedCategory = 'Intellectual';
   int _selectedPriority = 2; // 1=High, 2=Medium, 3=Low
   int _estimatedMinutes = 30;
-  DateTime? _selectedDueDate;
-  TimeOfDay? _selectedTime;
+  
+  // Two-date system
+  DateTime? _selectedDeadline;
+  TimeOfDay? _deadlineTime;
+  DateTime? _selectedScheduledDate;
+  TimeOfDay? _scheduledTime;
+  
   bool _isLoading = false;
   
   // Recurring task fields
   String _scheduleType = 'one-time'; // 'one-time', 'daily', 'weekly'
-  TimeOfDay? _scheduledTime;
   List<int> _scheduledDays = []; // 1=Monday, 7=Sunday
   
   final List<String> _categories = [
@@ -50,8 +54,27 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _selectedCategory = t.category;
       _selectedPriority = t.priority;
       _estimatedMinutes = t.estimatedMinutes ?? _estimatedMinutes;
-      _selectedDueDate = t.dueDate;
-      if (t.scheduledTime != null) {
+      
+      // Handle deadline
+      _selectedDeadline = t.deadline;
+      if (t.deadline != null) {
+        _deadlineTime = TimeOfDay(
+          hour: t.deadline!.hour,
+          minute: t.deadline!.minute,
+        );
+      }
+      
+      // Handle scheduled date/time
+      _selectedScheduledDate = t.scheduledDateTime;
+      if (t.scheduledDateTime != null) {
+        _scheduledTime = TimeOfDay(
+          hour: t.scheduledDateTime!.hour,
+          minute: t.scheduledDateTime!.minute,
+        );
+      }
+      
+      // Handle recurring task scheduled time
+      if (t.scheduledTime != null && _scheduledTime == null) {
         final parts = t.scheduledTime!.split(':');
         if (parts.length >= 2) {
           final h = int.tryParse(parts[0]) ?? 0;
@@ -59,6 +82,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           _scheduledTime = TimeOfDay(hour: h, minute: m);
         }
       }
+      
       _scheduleType = t.scheduleType ?? 'one-time';
       _scheduledDays = List<int>.from(t.scheduledDays ?? []);
     }
@@ -71,27 +95,51 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     super.dispose();
   }
   
-  Future<void> _selectDueDate() async {
+  Future<void> _selectDeadlineDate() async {
     final date = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
+      initialDate: _selectedDeadline ?? DateTime.now().add(const Duration(days: 1)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     
     if (date != null) {
-      setState(() => _selectedDueDate = date);
+      setState(() => _selectedDeadline = date);
     }
   }
   
-  Future<void> _selectTime() async {
+  Future<void> _selectDeadlineTime() async {
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: _deadlineTime ?? TimeOfDay.now(),
     );
     
     if (time != null) {
-      setState(() => _selectedTime = time);
+      setState(() => _deadlineTime = time);
+    }
+  }
+  
+  Future<void> _selectScheduledDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _selectedScheduledDate ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    
+    if (date != null) {
+      setState(() => _selectedScheduledDate = date);
+    }
+  }
+  
+  Future<void> _selectScheduledDateTime() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _scheduledTime ?? TimeOfDay.now(),
+    );
+    
+    if (time != null) {
+      setState(() => _scheduledTime = time);
     }
   }
   
@@ -111,15 +159,27 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     
     setState(() => _isLoading = true);
     
-    // Combine date and time if both are selected
-    DateTime? finalDueDate = _selectedDueDate;
-    if (_selectedDueDate != null && _selectedTime != null) {
-      finalDueDate = DateTime(
-        _selectedDueDate!.year,
-        _selectedDueDate!.month,
-        _selectedDueDate!.day,
-        _selectedTime!.hour,
-        _selectedTime!.minute,
+    // Combine deadline date and time if both are selected
+    DateTime? finalDeadline = _selectedDeadline;
+    if (_selectedDeadline != null && _deadlineTime != null) {
+      finalDeadline = DateTime(
+        _selectedDeadline!.year,
+        _selectedDeadline!.month,
+        _selectedDeadline!.day,
+        _deadlineTime!.hour,
+        _deadlineTime!.minute,
+      );
+    }
+    
+    // Combine scheduled date and time if both are selected
+    DateTime? finalScheduledDateTime = _selectedScheduledDate;
+    if (_selectedScheduledDate != null && _scheduledTime != null) {
+      finalScheduledDateTime = DateTime(
+        _selectedScheduledDate!.year,
+        _selectedScheduledDate!.month,
+        _selectedScheduledDate!.day,
+        _scheduledTime!.hour,
+        _scheduledTime!.minute,
       );
     }
     
@@ -138,7 +198,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             : _descriptionController.text.trim(),
         category: _selectedCategory,
         priority: _selectedPriority,
-        dueDate: finalDueDate,
+        deadline: finalDeadline,
+        scheduledDateTime: finalScheduledDateTime,
         estimatedMinutes: _estimatedMinutes,
         scheduleType: _scheduleType != 'one-time' ? _scheduleType : null,
         scheduledTime: formattedScheduledTime,
@@ -156,7 +217,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             : _descriptionController.text.trim(),
         category: _selectedCategory,
         priority: _selectedPriority,
-        dueDate: finalDueDate,
+        deadline: finalDeadline,
+        scheduledDateTime: finalScheduledDateTime,
         estimatedMinutes: _estimatedMinutes,
         scheduleType: _scheduleType != 'one-time' ? _scheduleType : null,
         scheduledTime: formattedScheduledTime,
@@ -373,16 +435,16 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             
             const SizedBox(height: 20),
             
-            // Due Date & Time Section
+            // Scheduled Time Section (When you plan to work on it) - Moved above deadline
             _buildSectionCard(
-              title: 'Due Date & Time',
-              icon: Icons.event,
-              trailing: (_selectedDueDate != null || _selectedTime != null)
+              title: 'Scheduled Time',
+              icon: Icons.today,
+              trailing: (_selectedScheduledDate != null)
                   ? TextButton.icon(
                       onPressed: () {
                         setState(() {
-                          _selectedDueDate = null;
-                          _selectedTime = null;
+                          _selectedScheduledDate = null;
+                          _scheduledTime = null;
                         });
                       },
                       icon: const Icon(Icons.clear, size: 16),
@@ -394,104 +456,291 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                     )
                   : null,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Due Date
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _isLoading ? null : _selectDueDate,
-                      icon: Icon(
-                        Icons.calendar_today,
-                        color: _selectedDueDate != null ? Colors.blue : null,
-                      ),
-                      label: Text(
-                        _selectedDueDate == null
-                            ? 'Set Due Date'
-                            : _formatDate(_selectedDueDate!),
-                        style: TextStyle(
-                          color: _selectedDueDate != null ? Colors.blue : null,
-                          fontWeight: _selectedDueDate != null ? FontWeight.bold : null,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.all(16),
-                        backgroundColor: _selectedDueDate != null 
-                            ? Colors.blue.withValues(alpha: 0.1) 
-                            : null,
-                        side: BorderSide(
-                          color: _selectedDueDate != null 
-                              ? Colors.blue 
-                              : Colors.grey.shade300,
-                          width: _selectedDueDate != null ? 2 : 1,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+                  const Text(
+                    '🎯 When do you plan to work on this task?',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
-                  
                   const SizedBox(height: 12),
                   
-                  // Time
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _isLoading ? null : _selectTime,
-                      icon: Icon(
-                        Icons.access_time,
-                        color: _selectedTime != null ? Colors.blue : null,
-                      ),
-                      label: Text(
-                        _selectedTime == null
-                            ? 'Set Time'
-                            : _selectedTime!.format(context),
-                        style: TextStyle(
-                          color: _selectedTime != null ? Colors.blue : null,
-                          fontWeight: _selectedTime != null ? FontWeight.bold : null,
+                  Row(
+                    children: [
+                      // Scheduled Date
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoading ? null : _selectScheduledDate,
+                          icon: Icon(
+                            Icons.today,
+                            color: _selectedScheduledDate != null ? Colors.green.shade600 : null,
+                            size: 20,
+                          ),
+                          label: Text(
+                            _selectedScheduledDate == null
+                                ? 'Pick Date'
+                                : _formatDate(_selectedScheduledDate!),
+                            style: TextStyle(
+                              color: _selectedScheduledDate != null ? Colors.green.shade600 : null,
+                              fontWeight: _selectedScheduledDate != null ? FontWeight.bold : null,
+                              fontSize: 13,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                            backgroundColor: _selectedScheduledDate != null 
+                                ? Colors.green.shade50 
+                                : null,
+                            side: BorderSide(
+                              color: _selectedScheduledDate != null 
+                                  ? Colors.green.shade300
+                                  : Colors.grey.shade300,
+                              width: _selectedScheduledDate != null ? 2 : 1,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                         ),
                       ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.all(16),
-                        backgroundColor: _selectedTime != null 
-                            ? Colors.blue.withValues(alpha: 0.1) 
-                            : null,
-                        side: BorderSide(
-                          color: _selectedTime != null 
-                              ? Colors.blue 
-                              : Colors.grey.shade300,
-                          width: _selectedTime != null ? 2 : 1,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      
+                      const SizedBox(width: 12),
+                      
+                      // Scheduled Time
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: (_isLoading || _selectedScheduledDate == null) ? null : _selectScheduledDateTime,
+                          icon: Icon(
+                            Icons.access_time,
+                            color: _scheduledTime != null ? Colors.green.shade600 : null,
+                            size: 20,
+                          ),
+                          label: Text(
+                            _scheduledTime == null
+                                ? 'Time'
+                                : _scheduledTime!.format(context),
+                            style: TextStyle(
+                              color: _scheduledTime != null ? Colors.green.shade600 : null,
+                              fontWeight: _scheduledTime != null ? FontWeight.bold : null,
+                              fontSize: 13,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                            backgroundColor: _scheduledTime != null 
+                                ? Colors.green.shade50 
+                                : null,
+                            side: BorderSide(
+                              color: _scheduledTime != null 
+                                  ? Colors.green.shade300
+                                  : Colors.grey.shade300,
+                              width: _scheduledTime != null ? 2 : 1,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                   
-                  // Preview selected date/time
-                  if (_selectedDueDate != null)
+                  // Quick time buttons
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildQuickTimeChip('Today', () {
+                        setState(() => _selectedScheduledDate = DateTime.now());
+                      }),
+                      _buildQuickTimeChip('Tomorrow', () {
+                        setState(() => _selectedScheduledDate = DateTime.now().add(const Duration(days: 1)));
+                      }),
+                      _buildQuickTimeChip('Next Week', () {
+                        setState(() => _selectedScheduledDate = DateTime.now().add(const Duration(days: 7)));
+                      }),
+                    ],
+                  ),
+                  
+                  // Scheduled Preview
+                  if (_selectedScheduledDate != null)
                     Padding(
-                      padding: const EdgeInsets.only(top: 16),
+                      padding: const EdgeInsets.only(top: 12),
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.blue.withValues(alpha: 0.1),
+                          color: Colors.green.shade50,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: Colors.blue.withValues(alpha: 0.3),
+                            color: Colors.green.shade200,
                           ),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.info_outline, size: 18, color: Colors.blue),
+                            Icon(Icons.work_outline, size: 18, color: Colors.green.shade600),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                _getDateTimePreview(),
+                                _getScheduledPreview(),
                                 style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.blue.shade700,
+                                  fontSize: 13,
+                                  color: Colors.green.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Deadline Section (When it MUST be completed)
+            _buildSectionCard(
+              title: 'Deadline',
+              icon: Icons.event,
+              trailing: (_selectedDeadline != null)
+                  ? TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _selectedDeadline = null;
+                          _deadlineTime = null;
+                        });
+                      },
+                      icon: const Icon(Icons.clear, size: 16),
+                      label: const Text('Clear'),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(50, 30),
+                      ),
+                    )
+                  : null,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '📅 When does this MUST be completed?',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  Row(
+                    children: [
+                      // Deadline Date
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoading ? null : _selectDeadlineDate,
+                          icon: Icon(
+                            Icons.calendar_today,
+                            color: _selectedDeadline != null ? Colors.red.shade600 : null,
+                            size: 20,
+                          ),
+                          label: Text(
+                            _selectedDeadline == null
+                                ? 'Set Date'
+                                : _formatDate(_selectedDeadline!),
+                            style: TextStyle(
+                              color: _selectedDeadline != null ? Colors.red.shade600 : null,
+                              fontWeight: _selectedDeadline != null ? FontWeight.bold : null,
+                              fontSize: 13,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                            backgroundColor: _selectedDeadline != null 
+                                ? Colors.red.shade50 
+                                : null,
+                            side: BorderSide(
+                              color: _selectedDeadline != null 
+                                  ? Colors.red.shade300
+                                  : Colors.grey.shade300,
+                              width: _selectedDeadline != null ? 2 : 1,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(width: 12),
+                      
+                      // Deadline Time
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: (_isLoading || _selectedDeadline == null) ? null : _selectDeadlineTime,
+                          icon: Icon(
+                            Icons.access_time,
+                            color: _deadlineTime != null ? Colors.red.shade600 : null,
+                            size: 20,
+                          ),
+                          label: Text(
+                            _deadlineTime == null
+                                ? 'Time'
+                                : _deadlineTime!.format(context),
+                            style: TextStyle(
+                              color: _deadlineTime != null ? Colors.red.shade600 : null,
+                              fontWeight: _deadlineTime != null ? FontWeight.bold : null,
+                              fontSize: 13,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                            backgroundColor: _deadlineTime != null 
+                                ? Colors.red.shade50 
+                                : null,
+                            side: BorderSide(
+                              color: _deadlineTime != null 
+                                  ? Colors.red.shade300
+                                  : Colors.grey.shade300,
+                              width: _deadlineTime != null ? 2 : 1,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  // Deadline Preview
+                  if (_selectedDeadline != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.red.shade200,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.schedule, size: 18, color: Colors.red.shade600),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _getDeadlinePreview(),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.red.shade700,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -863,11 +1112,11 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     );
   }
   
-  String _getDateTimePreview() {
-    if (_selectedDueDate == null) return '';
+  String _getDeadlinePreview() {
+    if (_selectedDeadline == null) return '';
     
     final now = DateTime.now();
-    final selectedDate = DateTime(_selectedDueDate!.year, _selectedDueDate!.month, _selectedDueDate!.day);
+    final selectedDate = DateTime(_selectedDeadline!.year, _selectedDeadline!.month, _selectedDeadline!.day);
     final today = DateTime(now.year, now.month, now.day);
     final tomorrow = today.add(const Duration(days: 1));
     
@@ -877,13 +1126,72 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     } else if (selectedDate == tomorrow) {
       dateStr = 'Tomorrow';
     } else {
-      dateStr = _formatDate(_selectedDueDate!);
+      final difference = selectedDate.difference(today).inDays;
+      if (difference > 0) {
+        dateStr = 'In $difference day${difference > 1 ? 's' : ''}';
+      } else {
+        dateStr = '${difference.abs()} day${difference.abs() > 1 ? 's' : ''} ago';
+      }
     }
     
-    if (_selectedTime != null) {
-      return 'Due: $dateStr at ${_selectedTime!.format(context)}';
+    if (_deadlineTime != null) {
+      return 'Deadline: $dateStr at ${_deadlineTime!.format(context)}';
     } else {
-      return 'Due: $dateStr (no specific time)';
+      return 'Deadline: $dateStr (any time)';
     }
+  }
+  
+  String _getScheduledPreview() {
+    if (_selectedScheduledDate == null) return '';
+    
+    final now = DateTime.now();
+    final selectedDate = DateTime(_selectedScheduledDate!.year, _selectedScheduledDate!.month, _selectedScheduledDate!.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    
+    String dateStr;
+    if (selectedDate == today) {
+      dateStr = 'Today';
+    } else if (selectedDate == tomorrow) {
+      dateStr = 'Tomorrow';
+    } else {
+      final difference = selectedDate.difference(today).inDays;
+      if (difference > 0) {
+        dateStr = 'In $difference day${difference > 1 ? 's' : ''}';
+      } else {
+        dateStr = '${difference.abs()} day${difference.abs() > 1 ? 's' : ''} ago';
+      }
+    }
+    
+    if (_scheduledTime != null) {
+      return 'Scheduled: $dateStr at ${_scheduledTime!.format(context)}';
+    } else {
+      return 'Scheduled: $dateStr (any time)';
+    }
+  }
+  
+  Widget _buildQuickTimeChip(String label, VoidCallback onPressed) {
+    return InkWell(
+      onTap: _isLoading ? null : onPressed,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.blue.shade200,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.blue.shade700,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
   }
 }

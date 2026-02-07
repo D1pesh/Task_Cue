@@ -4,6 +4,7 @@ import 'tasks_list_screen.dart';
 import 'analytics_screen.dart';
 import 'community_screen.dart';
 import 'profile_screen.dart';
+import '../services/notification_service.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -22,6 +23,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     const CommunityScreen(),
     const ProfileScreen(),
   ];
+  
+  @override
+  void initState() {
+    super.initState();
+    _requestNotificationPermissions();
+  }
+  
+  Future<void> _requestNotificationPermissions() async {
+    final hasPermission = await NotificationService.areNotificationsEnabled();
+    if (!hasPermission) {
+      await NotificationService.requestPermissions();
+    }
+  }
   
   @override
   Widget build(BuildContext context) {

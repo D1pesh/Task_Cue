@@ -498,13 +498,61 @@ class _HomeScreenState extends State<HomeScreen> {
             fontWeight: FontWeight.w500,
           ),
         ),
-        subtitle: task.description != null
-            ? Text(
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (task.description != null)
+              Text(
                 task.description!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-              )
-            : null,
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                // Scheduled time
+                if (task.scheduledDateTime != null)
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(Icons.schedule, size: 14, color: Colors.green.shade600),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatTaskTime(task.scheduledDateTime!),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                // Deadline
+                if (task.deadline != null)
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(Icons.flag, size: 14, color: task.isOverdue ? Colors.red : Colors.orange.shade600),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${task.isOverdue ? "Overdue" : "Due"} ${_formatTaskTime(task.deadline!)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: task.isOverdue ? Colors.red : Colors.orange.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -553,6 +601,9 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () {
               Navigator.pop(context);
               taskProvider.deleteTask(task.id);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('"${task.title}" deleted')),
+              );
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),
@@ -560,6 +611,31 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+  
+  String _formatTaskTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final taskDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final yesterday = today.subtract(const Duration(days: 1));
+    
+    String timeStr = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    
+    if (taskDate == today) {
+      return 'Today $timeStr';
+    } else if (taskDate == tomorrow) {
+      return 'Tomorrow $timeStr';
+    } else if (taskDate == yesterday) {
+      return 'Yesterday $timeStr';
+    } else {
+      final difference = taskDate.difference(today).inDays;
+      if (difference > 0) {
+        return 'In ${difference}d $timeStr';
+      } else {
+        return '${difference.abs()}d ago $timeStr';
+      }
+    }
   }
 
   Widget _buildEmptyState() {
