@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/task_provider.dart';
+import 'providers/timer_provider.dart';
 import 'screens/main_navigation_screen.dart';
 import 'services/notification_service.dart';
 
@@ -18,8 +19,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => TaskProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => TaskProvider()),
+        ChangeNotifierProvider(create: (context) => TimerProvider()),
+      ],
       child: MaterialApp(
         title: 'TaskCue',
         debugShowCheckedModeBanner: false,

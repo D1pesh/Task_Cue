@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import '../providers/task_provider.dart';
+import '../providers/timer_provider.dart';
+import '../widgets/floating_stopwatch.dart';
 import 'task_form_screen.dart';
 import 'settings_screen.dart';
 
@@ -12,18 +15,34 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  Timer? _timerTicker;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<TaskProvider>(context, listen: false).loadTasks();
     });
+    
+    // Start timer ticker for updating elapsed time
+    _timerTicker = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+      if (timerProvider.isRunning) {
+        timerProvider.updateElapsedTime();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timerTicker?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<TaskProvider>(
-      builder: (context, taskProvider, child) {
+    return Consumer2<TaskProvider, TimerProvider>(
+      builder: (context, taskProvider, timerProvider, child) {
         return Scaffold(
           appBar: AppBar(
         title: const Text('TaskCue'),
@@ -60,22 +79,40 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-          body: RefreshIndicator(
-            onRefresh: () async {
-              await taskProvider.refresh();
-            },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildWelcomeSection(taskProvider),
-                  const SizedBox(height: 20),
-                  _buildTodayTasksSection(taskProvider),
-                  const SizedBox(height: 20),
-                ],
+          body: Stack(
+            children: [
+              // Main content with refresh indicator
+              RefreshIndicator(
+                onRefresh: () async {
+                  await taskProvider.refresh();
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildWelcomeSection(taskProvider),
+                      const SizedBox(height: 20),
+                      _buildTodayTasksSection(taskProvider),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              
+              // Floating Timer
+              if (timerProvider.hasActiveTimer)
+                DraggableFloatingTimer(
+                  child: FloatingStopwatch(
+                    taskTitle: timerProvider.activeTask!.title,
+                    isPaused: timerProvider.isPaused,
+                    elapsedSeconds: timerProvider.elapsedSeconds,
+                    onPause: () => timerProvider.pauseTimer(),
+                    onResume: () => timerProvider.resumeTimer(),
+                    onStop: () => timerProvider.stopTimer(),
+                  ),
+                ),
+            ],
           ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () async {
@@ -92,9 +129,6 @@ class _HomeScreenState extends State<HomeScreen> {
             label: const Text('Add Task'),
           ),
         );
-      },
-    );
-  }
 
   Widget _buildWelcomeSection(TaskProvider taskProvider) {
     final todayTasks = taskProvider.todayTasks;
@@ -553,34 +587,74 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (task.isOverdue)
-              const Icon(Icons.warning, color: Colors.red, size: 20),
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 20),
-              onPressed: () async {
-                final result = await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => TaskFormScreen(
-                      taskProvider: taskProvider,
-                      initialTask: task,
+        trailing: Consumer<TimerProvider>(
+          builder: (context, timerProvider, child) {
+            final isActiveTimer = timerProvider.activeTask?.id == task.id;
+            
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (task.isOverdue)
+                  const Icon(Icons.warning, color: Colors.red, size: 20),
+                
+                // Timer Button (only for active tasks)
+                if (!isCompleted)
+                  IconButton(
+                    icon: Icon(
+                      isActiveTimer 
+                          ? (timerProvider.isPaused ? Icons.play_arrow : Icons.pause)
+                          : Icons.play_circle_outline,
+                      size: 20,
+                      color: isActiveTimer ? Colors.green : Colors.blue,
                     ),
+                    tooltip: isActiveTimer
+                        ? (timerProvider.isPaused ? 'Resume Timer' : 'Pause Timer')
+                        : 'Start Timer',
+                    onPressed: () {
+                      if (isActiveTimer) {
+                        timerProvider.toggleTimer();
+                      } else {
+                        // Stop any existing timer and start new one
+                        if (timerProvider.hasActiveTimer) {
+                          timerProvider.stopTimer(markComplete: false);
+                        }
+                        timerProvider.startTimer(task);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Timer started for "${task.title}"'),
+                            backgroundColor: Colors.green,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
                   ),
-                );
-                if (result == true) {
-                  taskProvider.refresh();
-                }
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20),
-              onPressed: () {
-                _showDeleteConfirmation(context, taskProvider, task);
-              },
-            ),
-          ],
+                
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 20),
+                  onPressed: () async {
+                    final result = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => TaskFormScreen(
+                          taskProvider: taskProvider,
+                          initialTask: task,
+                        ),
+                      ),
+                    );
+                    if (result == true) {
+                      taskProvider.refresh();
+                    }
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  onPressed: () {
+                    _showDeleteConfirmation(context, taskProvider, task);
+                  },
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
