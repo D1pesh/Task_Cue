@@ -22,6 +22,15 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<TaskProvider>(context, listen: false).loadTasks();
+      
+      // Set up timer provider callbacks
+      final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+      final taskProvider = Provider.of<TaskProvider>(context, listen: false);
+      
+      // Set callback to complete tasks when timer stops
+      timerProvider.setTaskCompleteCallback((taskId) {
+        taskProvider.completeTask(taskId);
+      });
     });
     
     // Start timer ticker for updating elapsed time
@@ -129,6 +138,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: const Text('Add Task'),
           ),
         );
+      },
+    );
+  }
 
   Widget _buildWelcomeSection(TaskProvider taskProvider) {
     final todayTasks = taskProvider.todayTasks;

@@ -13,6 +13,12 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   static bool _initialized = false;
+  static Function(String)? _onNotificationTapped;
+
+  /// Set callback for when notification is tapped
+  static void setNotificationTapCallback(Function(String) callback) {
+    _onNotificationTapped = callback;
+  }
 
   /// Initialize the notification service
   static Future<bool> initialize() async {
@@ -86,7 +92,11 @@ class NotificationService {
   /// Handle notification response (when user taps notification)
   static void _onNotificationResponse(NotificationResponse response) {
     debugPrint('Notification tapped: ${response.payload}');
-    // TODO: Navigate to specific task when notification is tapped
+    
+    // Navigate to specific task when notification is tapped
+    if (response.payload != null && _onNotificationTapped != null) {
+      _onNotificationTapped!(response.payload!);
+    }
   }
 
   /// Request notification permissions

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/task.dart';
+import '../services/notification_service.dart';
 
 class TimerProvider extends ChangeNotifier {
   Task? _activeTask;
@@ -8,6 +9,7 @@ class TimerProvider extends ChangeNotifier {
   int _elapsedSeconds = 0;
   DateTime? _startTime;
   DateTime? _pauseTime;
+  Function(String)? _onTaskComplete;
 
   // Getters
   Task? get activeTask => _activeTask;
@@ -15,6 +17,11 @@ class TimerProvider extends ChangeNotifier {
   bool get isPaused => _isPaused;
   int get elapsedSeconds => _elapsedSeconds;
   bool get hasActiveTimer => _activeTask != null;
+
+  // Set callback for task completion
+  void setTaskCompleteCallback(Function(String) callback) {
+    _onTaskComplete = callback;
+  }
 
   /// Start timer for a task
   void startTimer(Task task) {
@@ -65,14 +72,10 @@ class TimerProvider extends ChangeNotifier {
   /// Stop the timer and mark task as completed
   void stopTimer({bool markComplete = true}) {
     if (_activeTask != null) {
-      final task = _activeTask!;
-      
-      // Calculate total time worked
-      final totalTime = _elapsedSeconds;
-      
-      if (markComplete) {
-        // TODO: Mark task as completed and save work time
-        // This could integrate with TaskProvider to update the task
+      if (markComplete && _onTaskComplete != null) {
+        // Mark task as completed and save work time
+        _onTaskComplete!(_activeTask!.id);
+        debugPrint('Task "${_activeTask!.title}" completed after ${getFormattedTime()}');
       }
       
       // Reset timer state
@@ -101,10 +104,14 @@ class TimerProvider extends ChangeNotifier {
       // Pause current timer
       pauseTimer();
       
-      // TODO: Schedule notification to remind in X minutes
-      // This could integrate with NotificationService
+      // Schedule notification to remind in X minutes
+      final snoozeTime = DateTime.now().add(Duration(minutes: minutes));
+      final snoozeTask = _activeTask!.copyWith(
+        scheduledDateTime: snoozeTime,
+      );
+      NotificationService.scheduleTaskReminder(snoozeTask);
       
-      debugPrint('Task snoozed for $minutes minutes');
+      debugPrint('Task "${_activeTask!.title}" snoozed for $minutes minutes until ${snoozeTime.toString().substring(11, 16)}');
     }
   }
 

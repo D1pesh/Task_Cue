@@ -28,6 +28,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
     _requestNotificationPermissions();
+    
+    // Set up notification tap callback
+    NotificationService.setNotificationTapCallback((taskId) {
+      // Navigate to home screen and highlight the task
+      // For now, just navigate to home (task list)
+      setState(() {
+        _currentIndex = 0; // Navigate to home screen
+      });
+      
+      // TODO: Could add logic to scroll to specific task or open task details
+    });
   }
   
   Future<void> _requestNotificationPermissions() async {
