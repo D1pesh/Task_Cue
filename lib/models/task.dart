@@ -12,7 +12,7 @@ class Task {
   final DateTime? completedAt;
   
   // Recurring task fields
-  final String? scheduleType; // 'one-time', 'daily', 'weekly'
+  final String? scheduleType; // 'one-time', 'daily', 'weekly', 'weekend', 'custom'
   final String? scheduledTime; // Format: 'HH:mm' (for recurring tasks)
   final List<int>? scheduledDays; // 1=Mon, 2=Tue, ..., 7=Sun
 

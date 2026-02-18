@@ -26,7 +26,14 @@ class TaskService {
         return true; // Daily tasks show every day
       }
       
-      if (task.scheduleType == 'weekly' && task.scheduledDays != null) {
+      if (task.scheduleType == 'weekend') {
+        if (task.scheduledDays != null && task.scheduledDays!.isNotEmpty) {
+          return task.scheduledDays!.contains(currentWeekday);
+        }
+        return currentWeekday == DateTime.saturday || currentWeekday == DateTime.sunday;
+      }
+
+      if ((task.scheduleType == 'weekly' || task.scheduleType == 'custom') && task.scheduledDays != null) {
         return task.scheduledDays!.contains(currentWeekday);
       }
       

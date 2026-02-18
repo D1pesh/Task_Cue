@@ -45,7 +45,6 @@ def category_analytics(request):
         for category in categories:
             try:
                 stats = CategoryStats.objects.get(user=request.user, category=category)
-                weekly_progress = stats.get_weekly_progress()
                 
                 analytics_data.append({
                     'category_id': category.id,
@@ -53,10 +52,11 @@ def category_analytics(request):
                     'color': category.color,
                     'total_tasks': stats.total_tasks,
                     'completed_tasks': stats.completed_tasks,
+                    'pending_tasks': stats.pending_tasks,
+                    'overdue_tasks': stats.overdue_tasks,
                     'completion_rate': stats.completion_rate,
-                    'efficiency_score': stats.efficiency_score,
-                    'current_streak': stats.current_streak,
-                    'weekly_progress': weekly_progress,
+                    'on_time_completion_rate': stats.on_time_completion_rate,
+                    'productivity_score': stats.productivity_score,
                     'total_points': stats.total_points_earned,
                 })
             except CategoryStats.DoesNotExist:
@@ -67,10 +67,11 @@ def category_analytics(request):
                     'color': category.color,
                     'total_tasks': 0,
                     'completed_tasks': 0,
+                    'pending_tasks': 0,
+                    'overdue_tasks': 0,
                     'completion_rate': 0.0,
-                    'efficiency_score': 0.0,
-                    'current_streak': 0,
-                    'weekly_progress': {'total': 0, 'completed': 0, 'overdue': 0},
+                    'on_time_completion_rate': 0.0,
+                    'productivity_score': 0.0,
                     'total_points': 0,
                 })
         

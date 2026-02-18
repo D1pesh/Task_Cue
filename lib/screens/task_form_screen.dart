@@ -30,7 +30,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   bool _isLoading = false;
   
   // Recurring task fields
-  String _scheduleType = 'one-time'; // 'one-time', 'daily', 'weekly'
+  String _scheduleType = 'one-time'; // 'one-time', 'daily', 'weekly', 'weekend', 'custom'
   List<int> _scheduledDays = []; // 1=Monday, 7=Sunday
   
   final List<String> _categories = [
@@ -85,6 +85,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       
       _scheduleType = t.scheduleType ?? 'one-time';
       _scheduledDays = List<int>.from(t.scheduledDays ?? []);
+      if (_scheduleType == 'weekend' && _scheduledDays.isEmpty) {
+        _scheduledDays = [DateTime.saturday, DateTime.sunday];
+      }
     }
   }
   
@@ -189,6 +192,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       formattedScheduledTime = '${_scheduledTime!.hour.toString().padLeft(2, '0')}:${_scheduledTime!.minute.toString().padLeft(2, '0')}';
     }
     
+    final scheduledDaysForSubmission = _getScheduledDaysForSubmission();
+
     bool success = false;
     if (widget.initialTask == null) {
       success = await widget.taskProvider.createTask(
@@ -203,9 +208,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         estimatedMinutes: _estimatedMinutes,
         scheduleType: _scheduleType != 'one-time' ? _scheduleType : null,
         scheduledTime: formattedScheduledTime,
-        scheduledDays: _scheduleType == 'weekly' && _scheduledDays.isNotEmpty 
-            ? _scheduledDays 
-            : null,
+        scheduledDays: scheduledDaysForSubmission,
       );
     } else {
       // Update existing task
@@ -222,9 +225,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         estimatedMinutes: _estimatedMinutes,
         scheduleType: _scheduleType != 'one-time' ? _scheduleType : null,
         scheduledTime: formattedScheduledTime,
-        scheduledDays: _scheduleType == 'weekly' && _scheduledDays.isNotEmpty 
-            ? _scheduledDays 
-            : null,
+        scheduledDays: scheduledDaysForSubmission,
       );
     }
     
@@ -395,7 +396,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.blue.withValues(alpha: 0.1),
+                          color: Colors.blue.withAlpha((255 * 0.1).toInt()),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -413,9 +414,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                   SliderTheme(
                     data: SliderThemeData(
                       activeTrackColor: Colors.blue,
-                      inactiveTrackColor: Colors.blue.withValues(alpha: 0.2),
+                      inactiveTrackColor: Colors.blue.withAlpha((255 * 0.2).toInt()),
                       thumbColor: Colors.blue,
-                      overlayColor: Colors.blue.withValues(alpha: 0.2),
+                      overlayColor: Colors.blue.withAlpha((255 * 0.2).toInt()),
                       valueIndicatorColor: Colors.blue,
                     ),
                     child: Slider(
@@ -458,16 +459,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '🎯 When do you plan to work on this task?',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
                   Row(
                     children: [
                       // Scheduled Date
@@ -627,16 +618,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '📅 When does this MUST be completed?',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
                   Row(
                     children: [
                       // Deadline Date
@@ -763,13 +744,15 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Schedule Type Selector
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       _buildScheduleTypeChip('One-time', 'one-time'),
-                      const SizedBox(width: 8),
                       _buildScheduleTypeChip('Daily', 'daily'),
-                      const SizedBox(width: 8),
                       _buildScheduleTypeChip('Weekly', 'weekly'),
+                      _buildScheduleTypeChip('Weekend', 'weekend'),
+                      _buildScheduleTypeChip('Custom', 'custom'),
                     ],
                   ),
                   
@@ -805,7 +788,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.all(16),
                           backgroundColor: _scheduledTime != null 
-                              ? Colors.blue.withValues(alpha: 0.1) 
+                              ? Colors.blue.withAlpha((255 * 0.1).toInt()) 
                               : null,
                           side: BorderSide(
                             color: _scheduledTime != null 
@@ -821,8 +804,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                     ),
                   ],
                   
-                  // Show day selector for weekly tasks
-                  if (_scheduleType == 'weekly') ...[
+                  // Show day selector for weekly/custom patterns
+                  if (_scheduleType == 'weekly' || _scheduleType == 'custom') ...[
                     const SizedBox(height: 16),
                     const Text(
                       'Select Days',
@@ -855,10 +838,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
+                          color: Colors.green.withAlpha((255 * 0.1).toInt()),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: Colors.green.withValues(alpha: 0.3),
+                            color: Colors.green.withAlpha((255 * 0.3).toInt()),
                           ),
                         ),
                         child: Row(
@@ -867,9 +850,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                _scheduleType == 'daily'
-                                    ? 'Task will repeat daily at the scheduled time'
-                                    : 'Task will repeat on selected days at the scheduled time',
+                                _getRecurringInfoText(),
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: Colors.green.shade700,
@@ -897,7 +878,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.blue.withValues(alpha: 0.3),
+                    color: Colors.blue.withAlpha((255 * 0.3).toInt()),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -952,40 +933,46 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   
   Widget _buildScheduleTypeChip(String label, String value) {
     final isSelected = _scheduleType == value;
-    return Expanded(
-      child: ChoiceChip(
-        label: SizedBox(
-          width: double.infinity,
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
-        selected: isSelected,
-        onSelected: _isLoading ? null : (selected) {
-          if (selected) {
-            setState(() {
-              _scheduleType = value;
-              if (value == 'one-time') {
-                _scheduledTime = null;
-                _scheduledDays.clear();
-              }
-            });
-          }
-        },
-        selectedColor: Colors.blue,
-        backgroundColor: Colors.grey.shade200,
-        labelStyle: TextStyle(
-          color: isSelected ? Colors.white : Colors.black87,
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+      ),
+      selected: isSelected,
+      onSelected: _isLoading
+          ? null
+          : (selected) {
+              if (!selected) return;
+              setState(() {
+                _scheduleType = value;
+                if (value == 'one-time') {
+                  _scheduledTime = null;
+                  _scheduledDays.clear();
+                } else if (value == 'daily') {
+                  _scheduledDays.clear();
+                } else if (value == 'weekend') {
+                  _scheduledDays
+                    ..clear()
+                    ..addAll([DateTime.saturday, DateTime.sunday]);
+                } else if (value == 'weekly' || value == 'custom') {
+                  if (_scheduledDays.isEmpty) {
+                    final currentDay = DateTime.now().weekday;
+                    _scheduledDays.add(currentDay);
+                  }
+                }
+              });
+            },
+      selectedColor: Colors.blue,
+      backgroundColor: Colors.grey.shade200,
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : Colors.black87,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
       ),
     );
   }
@@ -1004,7 +991,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       onSelected: _isLoading ? null : (selected) {
         setState(() {
           if (selected) {
-            _scheduledDays.add(day);
+            if (!_scheduledDays.contains(day)) {
+              _scheduledDays.add(day);
+            }
           } else {
             _scheduledDays.remove(day);
           }
@@ -1027,7 +1016,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: Colors.grey.withAlpha((255 * 0.1).toInt()),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1050,7 +1039,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: Colors.grey.withAlpha((255 * 0.1).toInt()),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1067,7 +1056,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.1),
+                      color: Colors.blue.withAlpha((255 * 0.1).toInt()),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(icon, color: Colors.blue, size: 20),
@@ -1099,10 +1088,12 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       child: FilterChip(
         label: Text(label),
         selected: isSelected,
-        onSelected: _isLoading ? null : (selected) {
-          setState(() => _selectedPriority = value);
-        },
-        selectedColor: color.withValues(alpha: 0.3),
+        onSelected: _isLoading
+            ? null
+            : (selected) {
+                setState(() => _selectedPriority = value);
+              },
+        selectedColor: color.withAlpha((255 * 0.3).toInt()),
         checkmarkColor: color,
         labelStyle: TextStyle(
           color: isSelected ? color : Colors.grey.shade700,
@@ -1110,6 +1101,36 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         ),
       ),
     );
+  }
+
+  String _getRecurringInfoText() {
+    switch (_scheduleType) {
+      case 'daily':
+        return 'Task will repeat daily at the scheduled time';
+      case 'weekend':
+        return 'Task will repeat every Saturday and Sunday at the scheduled time';
+      case 'weekly':
+        return 'Task will repeat on selected days at the scheduled time';
+      case 'custom':
+        return 'Task will repeat on your custom-selected days at the scheduled time';
+      default:
+        return '';
+    }
+  }
+
+  List<int>? _getScheduledDaysForSubmission() {
+    if (_scheduleType == 'weekend') {
+      if (_scheduledDays.isEmpty) {
+        return [DateTime.saturday, DateTime.sunday];
+      }
+      return List<int>.from(_scheduledDays);
+    }
+
+    if ((_scheduleType == 'weekly' || _scheduleType == 'custom') && _scheduledDays.isNotEmpty) {
+      return List<int>.from(_scheduledDays);
+    }
+
+    return null;
   }
   
   String _getDeadlinePreview() {

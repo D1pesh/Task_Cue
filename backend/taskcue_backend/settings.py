@@ -6,8 +6,14 @@ import os
 import json
 from pathlib import Path
 from decouple import config
-import firebase_admin
-from firebase_admin import credentials
+
+# Firebase imports - optional, will be checked later
+try:
+    import firebase_admin
+    from firebase_admin import credentials
+    FIREBASE_SDK_AVAILABLE = True
+except ImportError:
+    FIREBASE_SDK_AVAILABLE = False
 
 # Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -33,9 +39,9 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
-    'users',
+    'users.apps.UsersConfig',
     'categories',
-    'tasks',
+    'tasks.apps.TasksConfig',
     'analytics',
     'gamification',
 ]
@@ -100,6 +106,12 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Custom User Model
 AUTH_USER_MODEL = 'users.CustomUser'
+
+# Authentication Backends
+AUTHENTICATION_BACKENDS = [
+    'users.authentication.FirebaseBackend',  # Firebase authentication
+    'django.contrib.auth.backends.ModelBackend',  # Default Django authentication
+]
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
@@ -168,36 +180,37 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Firebase Configuration
-try:
-    import firebase_admin
-    from firebase_admin import credentials
-    
-    FIREBASE_CONFIG = {
-        'type': config('FIREBASE_TYPE', default='service_account'),
-        'project_id': config('FIREBASE_PROJECT_ID', default=''),
-        'private_key_id': config('FIREBASE_PRIVATE_KEY_ID', default=''),
-        'private_key': config('FIREBASE_PRIVATE_KEY', default='').replace('\\n', '\n'),
-        'client_email': config('FIREBASE_CLIENT_EMAIL', default=''),
-        'client_id': config('FIREBASE_CLIENT_ID', default=''),
-        'auth_uri': config('FIREBASE_AUTH_URI', default='https://accounts.google.com/o/oauth2/auth'),
-        'token_uri': config('FIREBASE_TOKEN_URI', default='https://oauth2.googleapis.com/token'),
-        'auth_provider_x509_cert_url': config('FIREBASE_AUTH_PROVIDER_X509_CERT_URL', default='https://www.googleapis.com/oauth2/v1/certs'),
-        'client_x509_cert_url': config('FIREBASE_CLIENT_X509_CERT_URL', default=''),
-    }
+if FIREBASE_SDK_AVAILABLE:
+    try:
+        FIREBASE_CONFIG = {
+            'type': config('FIREBASE_TYPE', default='service_account'),
+            'project_id': config('FIREBASE_PROJECT_ID', default=''),
+            'private_key_id': config('FIREBASE_PRIVATE_KEY_ID', default=''),
+            'private_key': config('FIREBASE_PRIVATE_KEY', default='').replace('\\n', '\n'),
+            'client_email': config('FIREBASE_CLIENT_EMAIL', default=''),
+            'client_id': config('FIREBASE_CLIENT_ID', default=''),
+            'auth_uri': config('FIREBASE_AUTH_URI', default='https://accounts.google.com/o/oauth2/auth'),
+            'token_uri': config('FIREBASE_TOKEN_URI', default='https://oauth2.googleapis.com/token'),
+            'auth_provider_x509_cert_url': config('FIREBASE_AUTH_PROVIDER_X509_CERT_URL', default='https://www.googleapis.com/oauth2/v1/certs'),
+            'client_x509_cert_url': config('FIREBASE_CLIENT_X509_CERT_URL', default=''),
+        }
 
-    # Initialize Firebase Admin SDK
-    if not firebase_admin._apps:
-        try:
-            if FIREBASE_CONFIG['project_id']:
-                cred = credentials.Certificate(FIREBASE_CONFIG)
-                firebase_admin.initialize_app(cred)
-            else:
-                print("Warning: Firebase credentials not configured. Using default credentials.")
-                firebase_admin.initialize_app()
-        except Exception as e:
-            print(f"Warning: Failed to initialize Firebase: {e}")
-            
-except ImportError:
+        # Initialize Firebase Admin SDK
+        if not firebase_admin._apps:
+            try:
+                if FIREBASE_CONFIG['project_id']:
+                    cred = credentials.Certificate(FIREBASE_CONFIG)
+                    firebase_admin.initialize_app(cred)
+                    print("Firebase Admin SDK initialized successfully.")
+                else:
+                    print("Warning: Firebase credentials not configured. Using default credentials.")
+                    firebase_admin.initialize_app()
+            except Exception as e:
+                print(f"Warning: Failed to initialize Firebase: {e}")
+    except Exception as e:
+        print(f"Error configuring Firebase: {e}")
+        FIREBASE_CONFIG = {}
+else:
     print("Warning: Firebase Admin SDK not installed. Firebase features will be disabled.")
     FIREBASE_CONFIG = {}
 

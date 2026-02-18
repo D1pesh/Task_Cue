@@ -41,9 +41,9 @@ class CategoryStatsAdmin(admin.ModelAdmin):
     
     list_display = [
         'user', 'category', 'total_tasks', 'completed_tasks',
-        'completion_rate', 'current_streak', 'total_points_earned'
+        'completion_rate', 'total_points_earned'
     ]
-    list_filter = ['category', 'last_activity']
+    list_filter = ['category', 'last_updated']
     search_fields = ['user__email', 'category__name']
     
     fieldsets = (
@@ -52,27 +52,27 @@ class CategoryStatsAdmin(admin.ModelAdmin):
         }),
         ('Task Statistics', {
             'fields': (
-                'total_tasks', 'completed_tasks', 'overdue_tasks',
+                'total_tasks', 'completed_tasks', 'pending_tasks', 'overdue_tasks',
                 'completion_rate', 'on_time_completion_rate'
             )
         }),
         ('Time Tracking', {
             'fields': (
-                'total_time_spent', 'average_completion_time',
-                'most_productive_hour'
+                'total_time_spent', 'average_completion_time'
             )
         }),
-        ('Engagement', {
+        ('Gamification & Timestamps', {
             'fields': (
-                'current_streak', 'longest_streak',
-                'total_points_earned', 'last_activity'
+                'total_points_earned', 'first_task_created',
+                'last_task_completed', 'last_updated'
             )
         }),
     )
     
     readonly_fields = [
-        'total_tasks', 'completed_tasks', 'completion_rate',
-        'created_at', 'updated_at'
+        'total_tasks', 'completed_tasks', 'pending_tasks', 'overdue_tasks',
+        'completion_rate', 'on_time_completion_rate', 'first_task_created',
+        'last_task_completed', 'last_updated'
     ]
     
     def get_queryset(self, request):
