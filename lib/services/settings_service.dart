@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsService {
@@ -8,6 +9,7 @@ class SettingsService {
   static const _kDefaultDuration = 'default_duration';
   static const _kAutoStartTimer = 'auto_start_timer';
   static const _kDarkMode = 'dark_mode';
+  static const _kThemeMode = 'theme_mode';
 
   Future<SharedPreferences> _prefs() async => await SharedPreferences.getInstance();
 
@@ -71,13 +73,34 @@ class SettingsService {
     await p.setBool(_kAutoStartTimer, v);
   }
 
-  Future<bool> getDarkMode() async {
+  Future<ThemeMode> getThemeMode() async {
     final p = await _prefs();
-    return p.getBool(_kDarkMode) ?? false;
+    final stored = p.getString(_kThemeMode);
+
+    switch (stored) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      case 'system':
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    final p = await _prefs();
+    await p.setString(_kThemeMode, mode.name);
+
+    // Maintain backward compatibility for legacy dark mode flag
+    await p.setBool(_kDarkMode, mode == ThemeMode.dark);
+  }
+
+  Future<bool> getDarkMode() async {
+    return (await getThemeMode()) == ThemeMode.dark;
   }
 
   Future<void> setDarkMode(bool v) async {
-    final p = await _prefs();
-    await p.setBool(_kDarkMode, v);
+    await setThemeMode(v ? ThemeMode.dark : ThemeMode.light);
   }
 }
