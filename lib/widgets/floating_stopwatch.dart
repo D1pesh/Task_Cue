@@ -9,6 +9,10 @@ class FloatingStopwatch extends StatefulWidget {
   final VoidCallback onStop;
   final bool isPaused;
   final int elapsedSeconds;
+  final ValueChanged<int>? onSnooze;
+  final int currentXP;
+  final int pauseCount;
+  final int snoozeCount;
 
   const FloatingStopwatch({
     super.key,
@@ -18,6 +22,10 @@ class FloatingStopwatch extends StatefulWidget {
     required this.onStop,
     this.isPaused = false,
     this.elapsedSeconds = 0,
+    this.onSnooze,
+    this.currentXP = 0,
+    this.pauseCount = 0,
+    this.snoozeCount = 0,
   });
 
   @override
@@ -134,13 +142,13 @@ class _FloatingStopwatchState extends State<FloatingStopwatch>
               BoxShadow(
                 color: (widget.isPaused 
                     ? Colors.orange 
-                    : Colors.green).withValues(alpha: 0.4),
+                    : Colors.green).withAlpha((255 * 0.4).toInt()),
                 blurRadius: 16,
                 spreadRadius: 2,
                 offset: const Offset(0, 4),
               ),
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
+                color: Colors.black.withAlpha((255 * 0.2).toInt()),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -166,6 +174,29 @@ class _FloatingStopwatchState extends State<FloatingStopwatch>
                       fontSize: _expanded ? 16 : 14,
                       fontWeight: FontWeight.bold,
                       fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha((255 * 0.2).toInt()),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.stars, color: Colors.white, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${widget.currentXP} XP',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -203,7 +234,7 @@ class _FloatingStopwatchState extends State<FloatingStopwatch>
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: Colors.white.withAlpha((255 * 0.2).toInt()),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Icon(
@@ -222,7 +253,7 @@ class _FloatingStopwatchState extends State<FloatingStopwatch>
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: Colors.white.withAlpha((255 * 0.2).toInt()),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Icon(
@@ -241,7 +272,7 @@ class _FloatingStopwatchState extends State<FloatingStopwatch>
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: Colors.white.withAlpha((255 * 0.2).toInt()),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Icon(
@@ -266,8 +297,7 @@ class _FloatingStopwatchState extends State<FloatingStopwatch>
       context: context,
       builder: (context) => SnoozeDialog(
         onSnooze: (minutes) {
-          // Handle snooze logic here
-          Navigator.of(context).pop();
+          widget.onSnooze?.call(minutes);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Task snoozed for $minutes minutes'),
@@ -278,6 +308,8 @@ class _FloatingStopwatchState extends State<FloatingStopwatch>
       ),
     );
   }
+
+  
 
   void _showStopDialog(BuildContext context) {
     showDialog(

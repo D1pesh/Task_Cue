@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
 import '../providers/timer_provider.dart';
 import '../widgets/floating_stopwatch.dart';
+import '../widgets/xp_reward_animation.dart';
 // import 'profile_screen.dart';
 import 'badges_screen.dart';
 import 'settings_screen.dart';
@@ -31,8 +32,11 @@ class _HomeScreenState extends State<HomeScreen> {
       final taskProvider = Provider.of<TaskProvider>(context, listen: false);
 
       // Set callback to complete tasks when timer stops
-      timerProvider.setTaskCompleteCallback((taskId) {
-        taskProvider.completeTask(taskId);
+      timerProvider.setTaskCompleteCallback((taskId) async {
+        final rewardData = await taskProvider.completeTask(taskId);
+        if (rewardData != null && mounted) {
+          _showXPRewardDialog(rewardData);
+        }
       });
     });
 
@@ -129,21 +133,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     taskTitle: timerProvider.activeTask!.title,
                     isPaused: timerProvider.isPaused,
                     elapsedSeconds: timerProvider.elapsedSeconds,
-                    currentPoints: timerProvider.currentTaskPoints,
+                    currentXP: timerProvider.currentTaskXP,
                     pauseCount: timerProvider.pauseCount,
                     snoozeCount: timerProvider.snoozeCount,
                     onPause: () => timerProvider.pauseTimer(),
                     onResume: () => timerProvider.resumeTimer(),
                     onStop: () {
                       timerProvider.stopTimer();
-                      final awarded = timerProvider.lastAwardedPoints;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'You have been awarded ${_formatPoints(awarded)} points',
-                          ),
+                        const SnackBar(
+                          content: Text('Task completed!'),
                           backgroundColor: Colors.green,
-                          duration: const Duration(seconds: 3),
+                          duration: Duration(seconds: 2),
                         ),
                       );
                     },
@@ -485,16 +486,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return 'User';
   }
 
-  String _formatPoints(double value) {
-    if (value.isNaN || value.isInfinite) {
-      return '0';
-    }
-    if (value.roundToDouble() == value) {
-      return value.toStringAsFixed(0);
-    }
-    return value.toStringAsFixed(value >= 10 ? 1 : 2);
-  }
-
   void _openSettings() {
     Navigator.of(
       context,
@@ -643,9 +634,12 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListTile(
         leading: Checkbox(
           value: task.isCompleted,
-          onChanged: (value) {
+          onChanged: (value) async {
             if (value == true) {
-              taskProvider.completeTask(task.id);
+              final rewardData = await taskProvider.completeTask(task.id);
+              if (rewardData != null && mounted) {
+                _showXPRewardDialog(rewardData);
+              }
             }
           },
         ),
@@ -853,6 +847,22 @@ class _HomeScreenState extends State<HomeScreen> {
         return '${difference.abs()}d ago $timeStr';
       }
     }
+  }
+
+  void _showXPRewardDialog(Map<String, dynamic> rewardData) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => XPRewardAnimation(
+        xpEarned: rewardData['xpEarned'] ?? 0,
+        bonuses: List<String>.from(rewardData['bonuses'] ?? []),
+        rankedUp: rewardData['rankedUp'] as bool? ?? false,
+        newRank: rewardData['newRank'] as String?,
+        newAchievements: (rewardData['newAchievements'] as List?)
+            ?.map((a) => Map<String, String>.from(a as Map))
+            .toList(),
+      ),
+    );
   }
 
   Widget _buildEmptyState() {

@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/task_provider.dart';
-import '../providers/timer_provider.dart';
-import '../widgets/heatmap_widget.dart';
 
 const List<String> _taskCategories = [
   'Intellectual',
@@ -34,52 +32,12 @@ class AnalyticsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final taskProvider = context.watch<TaskProvider>();
-    final timerProvider = context.watch<TimerProvider>();
 
     final totalTasks = taskProvider.tasks.length;
     final completedTasks = taskProvider.completedCount;
     final completionRate = totalTasks > 0
         ? (completedTasks / totalTasks * 100).toInt()
         : 0;
-
-    final dailyPoints = timerProvider.dailyPoints;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final weekStart = today.subtract(const Duration(days: 6));
-
-    double weekPoints = 0;
-    int weekActiveDays = 0;
-    double bestWeekDayPoints = 0;
-    double bestOverallPoints = 0.0;
-    DateTime? bestWeekDay;
-    DateTime? bestOverallDay;
-
-    dailyPoints.forEach((date, points) {
-      if (points > bestOverallPoints) {
-        bestOverallPoints = points;
-        bestOverallDay = date;
-      }
-      if (!date.isBefore(weekStart) && !date.isAfter(today)) {
-        weekPoints += points;
-        if (points > 0) {
-          weekActiveDays++;
-          if (points > bestWeekDayPoints) {
-            bestWeekDayPoints = points;
-            bestWeekDay = date;
-          }
-        }
-      }
-    });
-
-    final weekHours = weekPoints / 60;
-    final averageWeekPerActiveDay = weekActiveDays > 0
-        ? weekPoints / weekActiveDays
-        : 0.0;
-    final streak = _calculateStreak(dailyPoints, today);
-    final totalPoints = timerProvider.totalPoints;
-    final averageMinutesPerTask = completedTasks > 0
-        ? totalPoints / completedTasks
-        : 0.0;
 
     final completedByCategory = {
       for (var category in _taskCategories) category: 0,
@@ -117,16 +75,6 @@ class AnalyticsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildThisWeekCard(
-              context,
-              weekPoints: weekPoints,
-              weekHours: weekHours,
-              activeDays: weekActiveDays,
-              averagePerActiveDay: averageWeekPerActiveDay,
-              bestDay: bestWeekDay,
-              bestDayPoints: bestWeekDayPoints,
-            ),
-            const SizedBox(height: 32),
             const Text(
               'Overview',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
@@ -136,34 +84,25 @@ class AnalyticsScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: _buildOverviewStat(
-                    'Total Points',
-                    _formatPoints(totalPoints),
-                    Icons.emoji_events,
-                    Colors.amber,
+                    'Total Tasks',
+                    '$totalTasks',
+                    Icons.task_alt,
+                    Colors.blue,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildOverviewStat(
-                    'Avg min/task',
-                    _formatMinutes(averageMinutesPerTask),
-                    Icons.timer_outlined,
-                    Colors.teal,
+                    'Completed',
+                    '$completedTasks',
+                    Icons.check_circle,
+                    Colors.green,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildOverviewStat(
-                    'Streak',
-                    '${streak}d',
-                    Icons.local_fire_department,
-                    Colors.orange,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildOverviewStat(
-                    'Completion Rate',
+                    'Completion',
                     '$completionRate%',
                     Icons.percent,
                     Colors.purple,
@@ -171,13 +110,6 @@ class AnalyticsScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 32),
-            const Text(
-              'Activity Heatmap',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            HeatmapWidget(dailyPoints: dailyPoints),
             const SizedBox(height: 32),
             const Text(
               'Completed Tasks by Category',
@@ -192,190 +124,9 @@ class AnalyticsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             _buildCategoryLegend(pieSegments, totalCategoryDone),
-            const SizedBox(height: 32),
-            const Text(
-              'Productivity Insights',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            _buildInsightCard(
-              context,
-              icon: Icons.trending_up,
-              title: 'Top Earning Day',
-              value: bestOverallDay != null
-                  ? _formatDayLabel(bestOverallDay!)
-                  : 'No data yet',
-              subtitle: bestOverallDay != null
-                  ? '${_formatPoints(bestOverallPoints)} points earned'
-                  : 'Start a focus session to see insights',
-              color: Colors.green,
-            ),
-            const SizedBox(height: 12),
-            _buildInsightCard(
-              context,
-              icon: Icons.access_time,
-              title: 'Avg Minutes per Task',
-              value: '${_formatMinutes(averageMinutesPerTask)} min',
-              subtitle: completedTasks > 0
-                  ? 'Across $completedTasks completed tasks'
-                  : 'Complete a task to unlock this insight',
-              color: Colors.blue,
-            ),
-            const SizedBox(height: 12),
-            _buildInsightCard(
-              context,
-              icon: Icons.calendar_today_outlined,
-              title: 'Weekly Active Days',
-              value: '$weekActiveDays days',
-              subtitle: weekActiveDays > 0
-                  ? 'Average ${_formatPoints(averageWeekPerActiveDay)} pts on active days'
-                  : 'No activity recorded this week',
-              color: Colors.purple,
-            ),
             const SizedBox(height: 24),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildThisWeekCard(
-    BuildContext context, {
-    required double weekPoints,
-    required double weekHours,
-    required int activeDays,
-    required double averagePerActiveDay,
-    required DateTime? bestDay,
-    required double bestDayPoints,
-  }) {
-    final bestDayLabel = bestDay != null
-        ? '${_formatDayLabel(bestDay)} • ${_formatPoints(bestDayPoints)} pts'
-        : 'No sessions yet';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'This Week',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue.shade400, Colors.blue.shade600],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withAlpha((255 * 0.15).toInt()),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.rocket_launch, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Great progress this week!',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildWeekStat('Points', _formatPoints(weekPoints)),
-                  _buildWeekStat('Minutes', _formatMinutes(weekPoints)),
-                  _buildWeekStat('Hours', _formatHours(weekHours)),
-                  _buildWeekStat('Active Days', activeDays.toString()),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                activeDays > 0
-                    ? 'Best day: $bestDayLabel • Avg ${_formatPoints(averagePerActiveDay)} pts per active day'
-                    : 'No focus sessions recorded yet this week.',
-                style: TextStyle(
-                  color: Colors.white.withAlpha((255 * 0.9).toInt()),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInsightCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String value,
-    required String subtitle,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withAlpha((255 * 0.1).toInt()),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -411,39 +162,6 @@ class AnalyticsScreen extends StatelessWidget {
             label,
             style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w500),
             textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeekStat(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withAlpha((255 * 0.15).toInt()),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withAlpha((255 * 0.2).toInt())),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.white.withAlpha((255 * 0.9).toInt()),
-              fontWeight: FontWeight.w500,
-            ),
           ),
         ],
       ),
@@ -505,60 +223,6 @@ class AnalyticsScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  static int _calculateStreak(
-    Map<DateTime, double> dailyPoints,
-    DateTime today,
-  ) {
-    int streak = 0;
-    DateTime cursor = today;
-    while (true) {
-      final points = dailyPoints[cursor] ?? 0;
-      if (points <= 0) {
-        break;
-      }
-      streak += 1;
-      cursor = cursor.subtract(const Duration(days: 1));
-    }
-    return streak;
-  }
-
-  static String _formatPoints(double value) {
-    if (value.isNaN || value.isInfinite) {
-      return '0';
-    }
-    if (value.roundToDouble() == value) {
-      return value.toStringAsFixed(0);
-    }
-    return value.toStringAsFixed(value >= 10 ? 1 : 2);
-  }
-
-  static String _formatMinutes(double value) {
-    if (value.isNaN || value.isInfinite) {
-      return '0';
-    }
-    return value.round().toString();
-  }
-
-  static String _formatHours(double hours) {
-    if (hours.isNaN || hours.isInfinite) {
-      return '0';
-    }
-    return hours >= 10 ? hours.toStringAsFixed(0) : hours.toStringAsFixed(1);
-  }
-
-  static String _formatDayLabel(DateTime date) {
-    const days = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    return days[(date.weekday - 1) % days.length];
   }
 }
 
