@@ -20,6 +20,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   String _selectedCategory = 'Intellectual';
   int _selectedPriority = 2; // 1=High, 2=Medium, 3=Low
   int _estimatedMinutes = 30;
+  bool _priorityManuallyChanged = false;
   
   // Two-date system
   DateTime? _selectedDeadline;
@@ -88,6 +89,41 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       if (_scheduleType == 'weekend' && _scheduledDays.isEmpty) {
         _scheduledDays = [DateTime.saturday, DateTime.sunday];
       }
+      
+      // If editing, we consider priority already "maintained"
+      _priorityManuallyChanged = true;
+    } else {
+      // Add listeners for keyword-based priority suggestions for NEW tasks
+      _titleController.addListener(_onInputChanged);
+      _descriptionController.addListener(_onInputChanged);
+    }
+  }
+
+  void _onInputChanged() {
+    if (_priorityManuallyChanged || widget.initialTask != null) return;
+
+    final text = '${_titleController.text} ${_descriptionController.text}'.toLowerCase();
+    
+    // Keywords that trigger High Priority
+    final highPriorityKeywords = [
+      'urgent', 'critical', 'emergency', 'asap', 'immediately', 
+      'instant', 'hotpack', 'now', 'deadline', 'alert', 'quick', 'mandatory'
+    ];
+
+    bool shouldBeHigh = false;
+    for (var kw in highPriorityKeywords) {
+      if (text.contains(kw)) {
+        shouldBeHigh = true;
+        break;
+      }
+    }
+
+    if (shouldBeHigh && _selectedPriority != 1) {
+      setState(() => _selectedPriority = 1);
+    } else if (!shouldBeHigh && _selectedPriority == 1) {
+      // If none of the keywords are present, and it was auto-set to High,
+      // revert it back to Medium if not manually changed.
+      setState(() => _selectedPriority = 2);
     }
   }
   
@@ -213,7 +249,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     } else {
       // Update existing task
       success = await widget.taskProvider.updateTask(
-        widget.initialTask!.id,
+        taskId: widget.initialTask!.id,
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim().isEmpty 
             ? null 
@@ -253,13 +289,19 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final topBarColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
+    final textColor = isDark ? Colors.white : const Color(0xFF1E293B);
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: bgColor,
       appBar: AppBar(
-        title: Text(widget.initialTask != null ? 'Edit Task' : 'Add Task', style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(widget.initialTask != null ? 'Edit Task' : 'Add Task', 
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         elevation: 0,
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
+        backgroundColor: topBarColor,
+        foregroundColor: textColor,
       ),
       body: Form(
         key: _formKey,
@@ -269,10 +311,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             // Header Section
             Text(
               widget.initialTask != null ? 'Edit Task' : 'Create a New Task',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: textColor,
               ),
             ),
             const SizedBox(height: 8),
@@ -280,7 +322,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               widget.initialTask != null ? 'Update fields to edit the task' : 'Fill in the details below to add your task',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey.shade600,
+                color: isDark ? Colors.grey.shade400 : const Color(0xFF64748B),
               ),
             ),
             const SizedBox(height: 24),
@@ -292,13 +334,15 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 decoration: InputDecoration(
                   labelText: 'Task Title *',
                   hintText: 'e.g., Complete project report',
-                  prefixIcon: const Icon(Icons.task_alt, color: Colors.blue),
+                  prefixIcon: const Icon(Icons.task_alt, color: Color(0xFF4F46E5)),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                   ),
                   filled: true,
                   fillColor: Colors.white,
                 ),
+                style: const TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.w600),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please enter a task title';
@@ -336,7 +380,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             // Category Card
             _buildCard(
               child: DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: InputDecoration(
                   labelText: 'Category *',
                   prefixIcon: const Icon(Icons.category, color: Colors.blue),
@@ -366,11 +410,11 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               icon: Icons.flag,
               child: Row(
                 children: [
-                  _buildPriorityChip('High', 1, Colors.red),
+                  _buildPriorityChip('High', 1, const Color(0xFFEF4444)),
                   const SizedBox(width: 8),
-                  _buildPriorityChip('Medium', 2, Colors.orange),
+                  _buildPriorityChip('Medium', 2, const Color(0xFFF59E0B)),
                   const SizedBox(width: 8),
-                  _buildPriorityChip('Low', 3, Colors.green),
+                  _buildPriorityChip('Low', 3, const Color(0xFF10B981)),
                 ],
               ),
             ),
@@ -413,11 +457,11 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                   const SizedBox(height: 8),
                   SliderTheme(
                     data: SliderThemeData(
-                      activeTrackColor: Colors.blue,
-                      inactiveTrackColor: Colors.blue.withAlpha((255 * 0.2).toInt()),
-                      thumbColor: Colors.blue,
-                      overlayColor: Colors.blue.withAlpha((255 * 0.2).toInt()),
-                      valueIndicatorColor: Colors.blue,
+                      activeTrackColor: const Color(0xFF4F46E5),
+                      inactiveTrackColor: const Color(0xFF4F46E5).withValues(alpha: 0.1),
+                      thumbColor: const Color(0xFF4F46E5),
+                      overlayColor: const Color(0xFF4F46E5).withValues(alpha: 0.1),
+                      valueIndicatorColor: const Color(0xFF4F46E5),
                     ),
                     child: Slider(
                       value: _estimatedMinutes.toDouble(),
@@ -1010,17 +1054,19 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   }
   
   Widget _buildCard({required Widget child}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withAlpha((255 * 0.1).toInt()),
+            color: Colors.black.withAlpha((255 * (isDark ? 0.3 : 0.1)).toInt()),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
+        border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.transparent),
       ),
       child: child,
     );
@@ -1032,18 +1078,20 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     required Widget child,
     Widget? trailing,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withAlpha((255 * 0.1).toInt()),
+            color: Colors.black.withAlpha((255 * (isDark ? 0.3 : 0.1)).toInt()),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
+        border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.transparent),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1064,10 +1112,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                   const SizedBox(width: 12),
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: isDark ? Colors.white : Colors.black87,
                     ),
                   ),
                 ],
@@ -1091,7 +1139,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         onSelected: _isLoading
             ? null
             : (selected) {
-                setState(() => _selectedPriority = value);
+                setState(() {
+                  _selectedPriority = value;
+                  _priorityManuallyChanged = true;
+                });
               },
         selectedColor: color.withAlpha((255 * 0.3).toInt()),
         checkmarkColor: color,

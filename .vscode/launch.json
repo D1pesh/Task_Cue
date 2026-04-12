@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "taskcue_admin_portal (Chrome)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "cwd": "admin_portal",
+            "args": [
+                "-d",
+                "chrome",
+                "--web-renderer",
+                "html"
+            ]
+        }
+    ]
+}

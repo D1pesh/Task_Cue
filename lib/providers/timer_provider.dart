@@ -1,4 +1,4 @@
-import 'dart:async';
+// import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/task.dart';
 import '../services/notification_service.dart';
@@ -16,7 +16,7 @@ class TimerProvider extends ChangeNotifier {
   int _pauseCount = 0;
   int _snoozeCount = 0;
 
-  // Getters
+  /// Getters
   Task? get activeTask => _activeTask;
   bool get isRunning => _isRunning;
   bool get isPaused => _isPaused;
@@ -44,10 +44,6 @@ class TimerProvider extends ChangeNotifier {
     _elapsedSeconds = 0;
     _startTime = DateTime.now();
     _pauseTime = null;
-    _activeTaskPoints = 0;
-    _awardedMinutes = 0;
-    _penaltySteps = 0;
-    _currentMultiplier = 1.0;
     _pauseCount = 0;
     _snoozeCount = 0;
 
@@ -67,12 +63,12 @@ class TimerProvider extends ChangeNotifier {
 
   /// Resume the timer
   void resumeTimer() {
-    if (_isPaused && _activeTask != null) {
-     currentXP = l && _startTime != null) {
-        final pauseDuration = DateTime.now().difference(_pauseTime!);
-        _startTime = _startTime!.add(pauseDuration);
-      }
+    if (_isPaused && _activeTask != null && _startTime != null) {
+      final pauseDuration = DateTime.now().difference(_pauseTime!);
+      _startTime = _startTime!.add(pauseDuration);
 
+      _isPaused = false;
+      _isRunning = true;
       _pauseTime = null;
       notifyListeners();
     }
@@ -87,7 +83,12 @@ class TimerProvider extends ChangeNotifier {
 
     if (markComplete && _onTaskComplete != null) {
       _onTaskComplete!(_activeTask!.id);
-      debugPrint('Task "${_activeTask!.title}" completed after ${getFormattedTime()}'
+      debugPrint(
+        'Task "${_activeTask!.title}" completed after ${getFormattedTime()}',
+      );
+    }
+
+    resetTimerState();
     notifyListeners();
   }
 
@@ -95,13 +96,13 @@ class TimerProvider extends ChangeNotifier {
   void updateElapsedTime() {
     if (_isRunning && _startTime != null) {
       _elapsedSeconds = DateTime.now().difference(_startTime!).inSeconds;
-      _calculateCurrentXP();
+      calculateCurrentXP();
       notifyListeners();
     }
   }
 
   /// Calculate XP based on elapsed time and task attributes
-  void _calculateCurrentXP() {
+  void calculateCurrentXP() {
     if (_activeTask == null) return;
 
     final durationMinutes = _elapsedSeconds ~/ 60;
@@ -113,12 +114,11 @@ class TimerProvider extends ChangeNotifier {
     // Map task priority to difficulty and priority strings
     String difficulty = 'medium';
     String priority = 'medium';
-    
+
     if (_activeTask!.priority == 1) {
       difficulty = 'easy';
     } else if (_activeTask!.priority == 2) {
       difficulty = 'medium';
-      priority = 'medium';
     } else if (_activeTask!.priority == 3) {
       difficulty = 'hard';
       priority = 'high';
@@ -127,7 +127,7 @@ class TimerProvider extends ChangeNotifier {
     // Base XP calculation (simplified, without streak/balance/focus bonuses during timer)
     int baseXP = difficulty == 'easy' ? 10 : (difficulty == 'hard' ? 35 : 20);
     double priorityMultiplier = priority == 'low' ? 1.0 : (priority == 'high' ? 1.5 : 1.2);
-    
+
     // Duration bonus (capped at +15)
     int durationBonus = 0;
     if (durationMinutes >= 120) {
@@ -140,6 +140,8 @@ class TimerProvider extends ChangeNotifier {
 
     // Calculate base XP (actual bonuses applied on completion)
     double rawXP = (baseXP * priorityMultiplier + durationBonus);
+    
+    // Now update the total XP
     _currentXP = rawXP.round();
   }
 
@@ -186,7 +188,8 @@ class TimerProvider extends ChangeNotifier {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  void _resetTimerState() {
+  /// Reset the timer state
+  void resetTimerState() {
     _activeTask = null;
     _isRunning = false;
     _isPaused = false;
@@ -196,5 +199,10 @@ class TimerProvider extends ChangeNotifier {
     _currentXP = 0;
     _pauseCount = 0;
     _snoozeCount = 0;
+  }
+
+  /// Award remaining time points (placeholder for actual implementation)
+  void _awardRemainingTimePoints() {
+    // Implement logic to award points for remaining time
   }
 }

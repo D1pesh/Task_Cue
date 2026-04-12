@@ -183,6 +183,7 @@ class NotificationService {
             : 'It\'s time to start working on this task!',
         scheduledDate,
         notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time,

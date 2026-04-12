@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "325158322063",
+    "project_id": "taskcue-f2192",
+    "storage_bucket": "taskcue-f2192.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:325158322063:android:c0880fe1137160368a55fa",
+        "android_client_info": {
+          "package_name": "com.taskcue.taskcue_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD362lG6pDWmbWuEwQASLOTQBN_zXfY0e4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

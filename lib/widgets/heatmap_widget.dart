@@ -15,13 +15,16 @@ class HeatmapWidget extends StatelessWidget {
   
   /// Get color intensity based on points earned
   Color _getColorForPoints(double points, bool isDark) {
-    if (points == 0) return isDark ? Colors.grey.shade800 : Colors.grey.shade200;
-    if (points < 30) return const Color(0xFFDCFCE7); // Very light green
-    if (points < 60) return const Color(0xFFA7F3D0); // Light green
-    if (points < 100) return const Color(0xFF6EE7B7); // Medium green
-    if (points < 150) return const Color(0xFF34D399); // Green
-    if (points < 200) return const Color(0xFF10B981); // Dark green
-    return const Color(0xFF059669); // Darkest green
+    if (points == 0) return isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+    
+    // Professional Scale (Teal to Indigo) tuned for XP accumulation
+    if (points < 20) return const Color(0xFFF1F5F9);
+    if (points < 50) return const Color(0xFFCCFBF1); 
+    if (points < 100) return const Color(0xFF99F6E4);
+    if (points < 200) return const Color(0xFF5EEAD4);
+    if (points < 350) return const Color(0xFF2DD4BF);
+    if (points < 500) return const Color(0xFF0D9488);
+    return const Color(0xFF0F766E); // Darkest teal for > 500 XP
   }
   
   @override
@@ -35,6 +38,28 @@ class HeatmapWidget extends StatelessWidget {
     // Calculate padding (0=Sunday, 1=Monday, etc.)
     final startWeekday = firstDayOfMonth.weekday % 7;
     final totalCells = startWeekday + daysInMonth;
+
+    // Pre-calculate all dates for the grid to avoid heavy logic in itemBuilder
+    final List<Map<String, dynamic>> gridData = List.generate(totalCells, (index) {
+      if (index < startWeekday) return {'isEmpty': true};
+      
+      final int dayNumber = (index - startWeekday + 1).toInt();
+      final date = DateTime(now.year, now.month, dayNumber);
+      final dateKey = DateTime(date.year, date.month, date.day);
+      
+      return {
+        'isEmpty': false,
+        'dayNumber': dayNumber,
+        'date': date,
+        'points': dailyPoints[dateKey] ?? 0.0,
+        'isToday': date.year == now.year && date.month == now.month && date.day == now.day,
+        'isFuture': date.isAfter(now),
+        'isSelected': selectedDate != null &&
+            selectedDate!.year == date.year &&
+            selectedDate!.month == date.month &&
+            selectedDate!.day == date.day,
+      };
+    });
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -42,12 +67,13 @@ class HeatmapWidget extends StatelessWidget {
       children: [
         // Month name
         Padding(
-          padding: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.only(bottom: 16),
           child: Text(
-            _getMonthName(now.month),
+            '${_getMonthName(now.month)} ${now.year}',
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
             ),
           ),
         ),
@@ -80,38 +106,32 @@ class HeatmapWidget extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 7,
-            mainAxisSpacing: 3,
-            crossAxisSpacing: 3,
+            mainAxisSpacing: 6,
+            crossAxisSpacing: 6,
             childAspectRatio: 1.0,
           ),
           itemCount: totalCells,
           itemBuilder: (context, index) {
-            // Empty cells before month starts
-            if (index < startWeekday) {
+            final data = gridData[index];
+            if (data['isEmpty'] == true) {
               return const SizedBox();
             }
             
-            final dayNumber = index - startWeekday + 1;
-            final date = DateTime(now.year, now.month, dayNumber);
-            final dateKey = DateTime(date.year, date.month, date.day);
-            final points = dailyPoints[dateKey] ?? 0.0;
-            final isSelected = selectedDate != null &&
-                selectedDate!.year == date.year &&
-                selectedDate!.month == date.month &&
-                selectedDate!.day == date.day;
-            final isToday = date.year == now.year &&
-                date.month == now.month &&
-                date.day == now.day;
-            final isFuture = date.isAfter(now);
+            final dayNumber = data['dayNumber'] as int;
+            final date = data['date'] as DateTime;
+            final points = data['points'] as double;
+            final isSelected = data['isSelected'] as bool;
+            final isToday = data['isToday'] as bool;
+            final isFuture = data['isFuture'] as bool;
             
             return GestureDetector(
               onTap: isFuture ? null : () => onDateTap?.call(date),
               child: Container(
                 decoration: BoxDecoration(
                   color: isFuture 
-                      ? (isDark ? Colors.grey.shade900 : Colors.grey.shade100)
+                      ? (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC))
                       : _getColorForPoints(points, isDark),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color: isSelected
                         ? Colors.blue
@@ -129,7 +149,7 @@ class HeatmapWidget extends StatelessWidget {
                       fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
                       color: isFuture
                           ? (isDark ? Colors.grey.shade600 : Colors.grey.shade400)
-                          : points > 100
+                          : points >= 200
                               ? Colors.white
                               : (isDark ? Colors.white70 : Colors.grey.shade800),
                     ),
@@ -147,7 +167,7 @@ class HeatmapWidget extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'Less',
+              '0 XP',
               style: TextStyle(
                 fontSize: 11,
                 color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
@@ -155,14 +175,16 @@ class HeatmapWidget extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             ...List.generate(5, (index) {
-              final points = index * 50.0;
+              // Create scale increments roughly matching (0, 50, 150, 300, 500)
+              final xpScalePoints = [0.0, 60.0, 150.0, 300.0, 600.0];
+              final samplePoints = xpScalePoints[index];
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 2),
                 child: Container(
                   width: 16,
                   height: 16,
                   decoration: BoxDecoration(
-                    color: _getColorForPoints(points, isDark),
+                    color: _getColorForPoints(samplePoints, isDark),
                     borderRadius: BorderRadius.circular(3),
                     border: Border.all(
                       color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
@@ -174,7 +196,7 @@ class HeatmapWidget extends StatelessWidget {
             }),
             const SizedBox(width: 8),
             Text(
-              'More',
+              '500+ XP',
               style: TextStyle(
                 fontSize: 11,
                 color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,

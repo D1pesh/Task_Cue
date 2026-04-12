@@ -3,13 +3,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 class AuthService extends ChangeNotifier {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static final AuthService _shared = AuthService();
+  static AuthService get instance => _shared;
 
-  User? get currentUser => _auth.currentUser;
-  bool get isAuthenticated => _auth.currentUser != null;
+  FirebaseAuth? _authInstance;
+  FirebaseFirestore? _firestoreInstance;
+
+  FirebaseAuth get _auth => _authInstance ?? FirebaseAuth.instance;
+  FirebaseFirestore get _firestore => _firestoreInstance ?? FirebaseFirestore.instance;
+
+  bool _isFirebaseInitialized = false;
+  bool get isFirebaseInitialized => _isFirebaseInitialized;
+
+  User? get currentUser => _isFirebaseInitialized ? _auth.currentUser : null;
+  bool get isAuthenticated => currentUser != null;
   
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  Stream<User?> get authStateChanges => _isFirebaseInitialized 
+      ? _auth.authStateChanges() 
+      : Stream.value(null);
 
   // Sign up with email and password
   Future<UserCredential?> signUp({
@@ -30,29 +41,62 @@ class AuthService extends ChangeNotifier {
       // Create user profile in Firestore
       if (credential.user != null) {
         try {
-          await _firestore.collection('users').doc(credential.user!.uid).set({
-            'email': email,
-            'displayName': displayName,
-            'createdAt': FieldValue.serverTimestamp(),
-            'role': 'user',
-            'profile': {
-              'timezone': 'UTC',
-              'language': 'en',
-              'theme': 'system',
-              'notifications_enabled': true,
-            },
-            'stats': {
-              'total_tasks': 0,
-              'completed_tasks': 0,
-              'total_points': 0,
-              'current_streak': 0,
-              'longest_streak': 0,
-            },
-          });
+          final userRef = _firestore.collection('users').doc(credential.user!.uid);
+          final userDoc = await userRef.get();
+          
+          if (!userDoc.exists) {
+            await userRef.set({
+              'email': email,
+              'displayName': displayName,
+              'createdAt': FieldValue.serverTimestamp(),
+              'role': 'user',
+              'profile': {
+                'timezone': 'UTC',
+                'language': 'en',
+                'theme': 'system',
+                'notifications_enabled': true,
+              },
+              'stats': {
+                'total_tasks': 0,
+                'completed_tasks': 0,
+                'total_points': 0,
+                'current_streak': 0,
+                'longest_streak': 0,
+              },
+              'gamification': {
+                'currentMonthXP': 0,
+                'currentRank': 'Aether',
+                'totalTasksCompleted': 0,
+                'currentStreak': 0,
+                'longestStreak': 0,
+                'dailyCategories': {},
+                'dailyTasksByCategory': {},
+                'tasksByDifficulty': {},
+                'tasksByPriority': {},
+                'tasksByCategory': {},
+                'longTaskCount': 0,
+                'prestigeRanks': {
+                  'Aether': 0,
+                  'Vanguard': 0,
+                  'Champion': 0,
+                  'Sentinel': 0,
+                  'Gladiator': 0,
+                  'Legion': 0,
+                  'Imperium': 0,
+                },
+                'achievementsUnlocked': [],
+                'lastTaskCompletedAt': null,
+                'lastMonthlyReset': FieldValue.serverTimestamp(),
+              },
+            });
+            debugPrint('New Firestore profile created for ${credential.user!.uid}');
+          } else {
+            debugPrint('Firestore profile already exists for ${credential.user!.uid}, skipping initialization.');
+          }
         } catch (e, stack) {
-          debugPrint('Failed to create Firestore profile for ${credential.user!.uid}: $e');
+          debugPrint('Failed to handle Firestore profile for ${credential.user!.uid}: $e');
           debugPrint(stack.toString());
-          rethrow;
+          // We don't rethrow here because the Auth account is already created
         }
       }
 
@@ -68,6 +112,12 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  // Pre-defined Superadmin credentials (should be stored securely, e.g., in environment variables)
+  static const String _superAdminEmail = 'superadmin@taskcue.com';
+  static const String _superAdminPassword = 'superadmin123';
+
+  static String get superAdminEmail => _superAdminEmail;
+
   // Sign in with email and password
   Future<UserCredential?> signIn({
     required String email,
@@ -79,11 +129,21 @@ class AuthService extends ChangeNotifier {
         password: password,
       );
 
-      // Update last active
+      // Update last active and check for Superadmin override
       if (credential.user != null) {
-        await _firestore.collection('users').doc(credential.user!.uid).update({
-          'lastActive': FieldValue.serverTimestamp(),
-        });
+        final userRef = _firestore.collection('users').doc(credential.user!.uid);
+        
+        // Superadmin check: If credentials match, elevate role
+        if (email == _superAdminEmail && password == _superAdminPassword) {
+          await userRef.update({
+            'lastActive': FieldValue.serverTimestamp(),
+            'role': 'superadmin', // Elevate to superadmin
+          });
+        } else {
+          await userRef.update({
+            'lastActive': FieldValue.serverTimestamp(),
+          });
+        }
       }
 
       notifyListeners();
@@ -91,6 +151,10 @@ class AuthService extends ChangeNotifier {
     } on FirebaseAuthException catch (e) {
       debugPrint('Sign in error: ${e.message}');
       rethrow;
+    } catch (e) {
+      // Handle non-Dart exceptions specifically for Web compatibility
+      debugPrint('Unexpected sign in error: ${e.toString()}');
+      throw Exception(e.toString());
     }
   }
 
@@ -123,7 +187,7 @@ class AuthService extends ChangeNotifier {
       final doc = await _firestore
           .collection('users')
           .doc(currentUser!.uid)
-          .get();
+          .get(const GetOptions(source: Source.serverAndCache));
       
       return doc.data();
     } catch (e) {
@@ -168,7 +232,10 @@ class AuthService extends ChangeNotifier {
   }
 
   // Get error message from FirebaseAuthException
-  static String getErrorMessage(FirebaseAuthException e) {
+  static String getErrorMessage(dynamic e) {
+    if (e is! FirebaseAuthException) {
+      return 'An unexpected error occurred. Please try again.';
+    }
     switch (e.code) {
       case 'user-not-found':
         return 'No user found with this email.';
@@ -196,4 +263,30 @@ class AuthService extends ChangeNotifier {
         return message;
     }
   }
+
+  Future<void> initialize() async {
+    try {
+      // Check if Firebase is initialized
+      _authInstance = FirebaseAuth.instance;
+      _firestoreInstance = FirebaseFirestore.instance;
+      _isFirebaseInitialized = true;
+      debugPrint('AuthService: Firebase confirmed initialized');
+    } catch (e) {
+      debugPrint('AuthService: Firebase not initialized or unavailable: $e');
+      _isFirebaseInitialized = false;
+    }
+
+    if (_isFirebaseInitialized && currentUser != null) {
+      await getUserProfile();
+    }
+  }
+
+  Future<bool> checkAdminStatus() async {
+    final profile = await getUserProfile();
+    if (profile == null) return false;
+
+    final role = (profile['role'] as String?)?.toLowerCase();
+    return role == 'admin' || role == 'superadmin';
+  }
 }
+

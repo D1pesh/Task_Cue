@@ -1,30 +1,62 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/task.dart';
 import 'notification_service.dart';
 
-/// Simple in-memory Task Service with CRUD operations
+/// Task Service heavily optimized for Firestore (with its built-in offline persistence)
 class TaskService {
-  // In-memory storage (replace with API/database later)
-  final List<Task> _tasks = [];
-  int _nextId = 1;
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
+  FirebaseAuth get _auth => FirebaseAuth.instance;
 
-  /// Get all tasks
-  Future<List<Task>> getTasks() async {
-    await Future.delayed(const Duration(milliseconds: 300)); // Simulate API delay
-    return List.from(_tasks);
+  bool get _isFirebaseReady {
+    try {
+      FirebaseFirestore.instance;
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
-  /// Get today's tasks
+  String? get _userId => _auth.currentUser?.uid;
+
+  CollectionReference? get _taskCollection {
+    if (_userId == null || !_isFirebaseReady) return null;
+    return _firestore.collection('users').doc(_userId).collection('tasks');
+  }
+
+  /// Get tasks from Firestore (automatically serves from the local cache if offline)
+  Future<List<Task>> getTasks({bool includeCompleted = true}) async {
+    if (_taskCollection == null) return [];
+
+    try {
+      Query query = _taskCollection!;
+      if (!includeCompleted) {
+        query = query.where('status', isNotEqualTo: 'completed');
+      }
+
+      final snapshot = await query.get();
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = data['id'] ?? doc.id; 
+        return Task.fromJson(data);
+      }).toList();
+    } catch (e) {
+      debugPrint('Error getting tasks from Firestore: $e');
+      return [];
+    }
+  }
+
+  /// Get today's tasks - Optimized to only fetch non-completed tasks
   Future<List<Task>> getTodayTasks() async {
-    await Future.delayed(const Duration(milliseconds: 300));
+    // Only fetch non-completed tasks for the daily view (HUGE performance boost)
+    final tasks = await getTasks(includeCompleted: false);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final currentWeekday = now.weekday; // 1=Mon, 2=Tue, ..., 7=Sun
+    final currentWeekday = now.weekday;
     
-    return _tasks.where((task) {
-      // For recurring tasks
-      if (task.scheduleType == 'daily') {
-        return true; // Daily tasks show every day
-      }
+    return tasks.where((task) {
+      if (task.scheduleType == 'daily') return true;
       
       if (task.scheduleType == 'weekend') {
         if (task.scheduledDays != null && task.scheduledDays!.isNotEmpty) {
@@ -37,9 +69,7 @@ class TaskService {
         return task.scheduledDays!.contains(currentWeekday);
       }
       
-      // For one-time tasks
       if (task.scheduleType == 'one-time' || task.scheduleType == null) {
-        // Prioritize scheduledDateTime if available
         if (task.scheduledDateTime != null) {
           final scheduledDate = DateTime(
             task.scheduledDateTime!.year,
@@ -49,7 +79,6 @@ class TaskService {
           return scheduledDate == today;
         }
         
-        // Fall back to deadline if no scheduled date
         if (task.deadline != null) {
           final deadlineDate = DateTime(
             task.deadline!.year,
@@ -59,7 +88,6 @@ class TaskService {
           return deadlineDate == today;
         }
         
-        // Show tasks with no dates (default to today)
         return task.deadline == null && task.scheduledDateTime == null;
       }
       
@@ -69,10 +97,16 @@ class TaskService {
 
   /// Get single task by ID
   Future<Task?> getTask(String id) async {
-    await Future.delayed(const Duration(milliseconds: 200));
+    if (_taskCollection == null) return null;
     try {
-      return _tasks.firstWhere((task) => task.id == id);
+      final doc = await _taskCollection!.doc(id).get();
+      if (!doc.exists) return null;
+      
+      final data = doc.data() as Map<String, dynamic>;
+      data['id'] = doc.id;
+      return Task.fromJson(data);
     } catch (e) {
+      debugPrint('Error getting single task from Firestore: $e');
       return null;
     }
   }
@@ -90,10 +124,11 @@ class TaskService {
     String? scheduledTime,
     List<int>? scheduledDays,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate API delay
-    
+    final docRef = _taskCollection?.doc();
+    final id = docRef?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
+
     final task = Task(
-      id: _nextId.toString(),
+      id: id,
       title: title,
       description: description,
       category: category,
@@ -108,10 +143,13 @@ class TaskService {
       scheduledDays: scheduledDays,
     );
     
-    _tasks.add(task);
-    _nextId++;
+    // Save to Firestore optimistically (NOT awaited, handles offline persistence gracefully)
+    if (_userId != null) {
+      _taskCollection?.doc(task.id).set(task.toJson()).catchError((e) {
+        debugPrint('Firestore createTask error: $e');
+      });
+    }
     
-    // Schedule notification if task has scheduled time
     if (task.scheduledDateTime != null) {
       NotificationService.scheduleTaskReminder(task);
     }
@@ -120,8 +158,8 @@ class TaskService {
   }
 
   /// Update existing task
-  Future<Task> updateTask(
-    String id, {
+  Future<Task> updateTask({
+    required String taskId,
     String? title,
     String? description,
     String? category,
@@ -134,14 +172,9 @@ class TaskService {
     String? scheduledTime,
     List<int>? scheduledDays,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    final oldTask = await getTask(taskId);
+    if (oldTask == null) throw Exception('Task not found');
     
-    final index = _tasks.indexWhere((task) => task.id == id);
-    if (index == -1) {
-      throw Exception('Task not found');
-    }
-    
-    final oldTask = _tasks[index];
     final updatedTask = oldTask.copyWith(
       title: title,
       description: description,
@@ -156,14 +189,14 @@ class TaskService {
       scheduledDays: scheduledDays,
     );
     
-    _tasks[index] = updatedTask;
+    if (_userId != null) {
+      _taskCollection?.doc(taskId).update(updatedTask.toJson()).catchError((e) {
+        debugPrint('Firestore updateTask error: $e');
+      });
+    }
     
-    // Handle notification scheduling for updated task
     if (updatedTask.scheduledDateTime != oldTask.scheduledDateTime) {
-      // Cancel old notification
       await NotificationService.cancelTaskNotification(oldTask);
-      
-      // Schedule new notification if task has scheduled time
       if (updatedTask.scheduledDateTime != null) {
         NotificationService.scheduleTaskReminder(updatedTask);
       }
@@ -174,42 +207,44 @@ class TaskService {
 
   /// Delete task
   Future<void> deleteTask(String id) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    
-    // Find task before deleting to cancel notification
-    final task = _tasks.where((t) => t.id == id).firstOrNull;
+    final task = await getTask(id);
     if (task != null) {
       await NotificationService.cancelTaskNotification(task);
     }
     
-    _tasks.removeWhere((task) => task.id == id);
+    if (_userId != null) {
+      _taskCollection?.doc(id).delete().catchError((e) {
+        debugPrint('Firestore deleteTask error: $e');
+      });
+    }
   }
 
   /// Mark task as completed
   Future<Task> completeTask(String id) async {
-    await Future.delayed(const Duration(milliseconds: 300));
+    final task = await getTask(id);
+    if (task == null) throw Exception('Task not found');
     
-    final index = _tasks.indexWhere((task) => task.id == id);
-    if (index == -1) {
-      throw Exception('Task not found');
-    }
-    
-    final updatedTask = _tasks[index].copyWith(
+    final updatedTask = task.copyWith(
       status: 'completed',
       completedAt: DateTime.now(),
     );
     
-    _tasks[index] = updatedTask;
+    if (_userId != null) {
+      _taskCollection?.doc(id).update(updatedTask.toJson()).catchError((e) {
+        debugPrint('Firestore completeTask error: $e');
+      });
+    }
+    
     return updatedTask;
   }
 
   /// Get task statistics
   Future<Map<String, int>> getStats() async {
-    await Future.delayed(const Duration(milliseconds: 200));
+    final tasks = await getTasks();
     
-    final completed = _tasks.where((t) => t.status == 'completed').length;
-    final pending = _tasks.where((t) => t.status == 'pending' && !t.isOverdue).length;
-    final overdue = _tasks.where((t) => t.isOverdue).length;
+    final completed = tasks.where((t) => t.status == 'completed').length;
+    final pending = tasks.where((t) => t.status == 'pending' && !t.isOverdue).length;
+    final overdue = tasks.where((t) => t.isOverdue).length;
     
     return {
       'completed': completed,
