@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../providers/task_provider.dart';
 import '../providers/theme_provider.dart';
-import '../providers/timer_provider.dart';
 import '../services/auth_service.dart';
 import '../widgets/prestige_display_widget.dart';
 import '../widgets/rank_card_widget.dart';
@@ -27,6 +26,10 @@ class ProfileScreen extends StatelessWidget {
         : (email.isNotEmpty ? email.substring(0, 1).toUpperCase() : 'U');
     final memberSince = _formatMemberSince(user);
 
+    final totalTasks = taskProvider.tasks.length;
+    final completedTasks = _countCompletedTasks(taskProvider);
+    final pendingTasks = totalTasks - completedTasks;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
@@ -40,7 +43,12 @@ class ProfileScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          padding: const EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 24,
+            bottom: 120,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -64,14 +72,20 @@ class ProfileScreen extends StatelessWidget {
                       return const Center(child: CircularProgressIndicator());
                     }
 
-                    final userData = snapshot.data?.data() as Map<String, dynamic>?;
-                    final stats = userData?['gamification'] as Map<String, dynamic>? ?? {};
-                    
+                    final userData =
+                        snapshot.data?.data() as Map<String, dynamic>?;
+                    final stats =
+                        userData?['gamification'] as Map<String, dynamic>? ??
+                        {};
+
                     final currentRank = stats['currentRank'] ?? 'Aether';
                     final currentXP = stats['currentMonthXP'] ?? 0;
-                    final totalTasksCompleted = stats['totalTasksCompleted'] ?? 0;
+                    final totalTasksCompleted =
+                        stats['totalTasksCompleted'] ?? 0;
                     final currentStreak = stats['currentStreak'] ?? 0;
-                    final prestigeRanks = Map<String, int>.from(stats['prestigeRanks'] ?? {});
+                    final prestigeRanks = Map<String, int>.from(
+                      stats['prestigeRanks'] ?? {},
+                    );
 
                     return Column(
                       children: [
@@ -92,7 +106,12 @@ class ProfileScreen extends StatelessWidget {
               ],
               _buildCompletionCard(context, taskProvider),
               const SizedBox(height: 24),
-              _buildTaskStatsRow(context, taskProvider),
+              _buildTaskStatsRow(
+                context,
+                totalTasks,
+                completedTasks,
+                pendingTasks,
+              ),
               const SizedBox(height: 32),
               _buildPreferencesSection(context, themeProvider),
               const SizedBox(height: 16),
@@ -102,6 +121,10 @@ class ProfileScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  int _countCompletedTasks(TaskProvider taskProvider) {
+    return taskProvider.tasks.where((task) => task.isCompleted == true).length;
   }
 
   Widget _buildProfileHeader({
@@ -116,33 +139,42 @@ class ProfileScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primaryContainer,
-            theme.colorScheme.primary.withAlpha((255 * 0.85).toInt()),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
+        color: theme.colorScheme.primary,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withValues(alpha: 0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 36,
-                backgroundColor: theme.colorScheme.onPrimary.withAlpha((255 * 0.12).toInt()),
-                child: Text(
-                  initial,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onPrimary,
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    width: 2,
+                  ),
+                ),
+                child: CircleAvatar(
+                  radius: 36,
+                  backgroundColor: Colors.white.withValues(alpha: 0.1),
+                  child: Text(
+                    initial,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 20),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,23 +182,16 @@ class ProfileScreen extends StatelessWidget {
                     Text(
                       name,
                       style: theme.textTheme.titleLarge?.copyWith(
-                        color: theme.colorScheme.onPrimary,
-                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       email,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onPrimary.withAlpha((255 * 0.85).toInt()),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      memberSince,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onPrimary.withAlpha((255 * 0.75).toInt()),
-                        letterSpacing: 0.3,
+                        color: Colors.white.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -174,78 +199,77 @@ class ProfileScreen extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              memberSince.toUpperCase(),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.white70,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.8,
+                fontSize: 9,
+              ),
+            ),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildInlineStat(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required int value,
-  }) {
-    final theme = Theme.of(context);
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(width: 6),
-        Text(
-          '$value',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
     );
   }
 
   Widget _buildCompletionCard(BuildContext context, TaskProvider taskProvider) {
     final theme = Theme.of(context);
     final total = taskProvider.tasks.length;
-    final completed = taskProvider.completedCount;
+    final completed = _countCompletedTasks(taskProvider);
     final percentage = total > 0 ? (completed / total) : 0.0;
-    final display = (percentage * 100).toInt();
+
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withAlpha(
-          (255 * (theme.brightness == Brightness.dark ? 0.35 : 0.9)).toInt(),
-        ),
-        borderRadius: BorderRadius.circular(24),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         children: [
           SizedBox(
-            width: 92,
-            height: 92,
+            width: 80,
+            height: 80,
             child: Stack(
               alignment: Alignment.center,
               children: [
                 SizedBox(
-                  width: 92,
-                  height: 92,
+                  width: 80,
+                  height: 80,
                   child: CircularProgressIndicator(
                     value: percentage,
-                    strokeWidth: 8,
-                    backgroundColor: theme.colorScheme.onSurface.withAlpha((255 * 0.1).toInt()),
-                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                    strokeWidth: 10,
+                    backgroundColor: theme.colorScheme.primary.withValues(
+                      alpha: 0.1,
+                    ),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      theme.colorScheme.primary,
+                    ),
+                    strokeCap: StrokeCap.round,
                   ),
                 ),
                 Text(
-                  '$display%',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  '${(percentage * 100).toInt()}%',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
                     color: theme.colorScheme.primary,
                   ),
                 ),
@@ -258,25 +282,26 @@ class ProfileScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Completion Rate',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                  'MASTERY',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
-                  '$completed of $total tasks completed',
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  '$completed / $total',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                Text(
+                  'Tasks Finished',
+                  style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
-                ),
-                const SizedBox(height: 12),
-                LinearProgressIndicator(
-                  value: percentage,
-                  backgroundColor: theme.colorScheme.onSurface.withAlpha((255 * 0.08).toInt()),
-                  valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
-                  minHeight: 6,
-                  borderRadius: BorderRadius.circular(12),
                 ),
               ],
             ),
@@ -286,22 +311,27 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTaskStatsRow(BuildContext context, TaskProvider taskProvider) {
+  Widget _buildTaskStatsRow(
+    BuildContext context,
+    int totalTasks,
+    int completedTasks,
+    int pendingTasks,
+  ) {
     final theme = Theme.of(context);
     final stats = [
       _StatMetric(
         label: 'Total Tasks',
-        value: taskProvider.tasks.length,
+        value: totalTasks,
         icon: Icons.list_alt_outlined,
       ),
       _StatMetric(
         label: 'Completed',
-        value: taskProvider.completedCount,
+        value: completedTasks,
         icon: Icons.check_circle_outline,
       ),
       _StatMetric(
         label: 'Pending',
-        value: taskProvider.pendingCount,
+        value: pendingTasks,
         icon: Icons.pending_actions_outlined,
       ),
     ];
@@ -311,9 +341,7 @@ class ProfileScreen extends StatelessWidget {
           .map(
             (stat) => Expanded(
               child: Padding(
-                padding: EdgeInsets.only(
-                  right: stat == stats.last ? 0 : 12,
-                ),
+                padding: EdgeInsets.only(right: stat == stats.last ? 0 : 12),
                 child: _buildStatTile(stat, theme),
               ),
             ),
@@ -323,29 +351,39 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildStatTile(_StatMetric stat, ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withAlpha(
-          (255 * (theme.brightness == Brightness.dark ? 0.3 : 1)).toInt(),
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.05)),
       ),
       child: Column(
         children: [
-          Icon(stat.icon, size: 28, color: theme.colorScheme.primary),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(stat.icon, size: 22, color: theme.colorScheme.primary),
+          ),
           const SizedBox(height: 12),
           Text(
             stat.value.toString(),
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 4),
           Text(
-            stat.label,
-            style: theme.textTheme.bodyMedium?.copyWith(
+            stat.label.toUpperCase(),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
               color: theme.colorScheme.onSurfaceVariant,
+              letterSpacing: 0.5,
             ),
           ),
         ],
@@ -353,7 +391,10 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPreferencesSection(BuildContext context, ThemeProvider themeProvider) {
+  Widget _buildPreferencesSection(
+    BuildContext context,
+    ThemeProvider themeProvider,
+  ) {
     final theme = Theme.of(context);
     final mode = themeProvider.themeMode;
 
@@ -366,7 +407,10 @@ class ProfileScreen extends StatelessWidget {
       child: Column(
         children: [
           ListTile(
-            leading: Icon(Icons.color_lens_outlined, color: theme.colorScheme.primary),
+            leading: Icon(
+              Icons.color_lens_outlined,
+              color: theme.colorScheme.primary,
+            ),
             title: const Text('Theme'),
             subtitle: Text(_describeThemeMode(mode)),
             trailing: const Icon(Icons.chevron_right),
@@ -374,7 +418,10 @@ class ProfileScreen extends StatelessWidget {
           ),
           const Divider(height: 1),
           ListTile(
-            leading: Icon(Icons.settings_applications_outlined, color: theme.colorScheme.primary),
+            leading: Icon(
+              Icons.settings_applications_outlined,
+              color: theme.colorScheme.primary,
+            ),
             title: const Text('App Settings'),
             subtitle: const Text('Notifications, defaults, appearance'),
             trailing: const Icon(Icons.chevron_right),
@@ -410,10 +457,10 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _showThemePicker(BuildContext context, ThemeProvider themeProvider) {
-    final theme = Theme.of(context);
-    final options = ThemeMode.values;
-
+  Future<void> _showThemePicker(
+    BuildContext context,
+    ThemeProvider themeProvider,
+  ) {
     return showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -429,35 +476,50 @@ class ProfileScreen extends StatelessWidget {
                 width: 44,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurface.withAlpha((255 * 0.2).toInt()),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withAlpha((255 * 0.2).toInt()),
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
               const SizedBox(height: 16),
               Text(
                 'Choose Theme',
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              ...options.map(
-                (mode) => RadioListTile<ThemeMode>(
-                  value: mode,
-                  groupValue: themeProvider.themeMode,
+              ...ThemeMode.values.map((mode) {
+                return ListTile(
+                  leading: Icon(_themeModeIcon(mode)),
                   title: Text(_describeThemeMode(mode)),
-                  onChanged: (value) {
-                    if (value != null) {
-                      themeProvider.setThemeMode(value);
-                      Navigator.of(context).pop();
-                    }
+                  trailing: themeProvider.themeMode == mode
+                      ? const Icon(Icons.check_circle, color: Colors.blue)
+                      : null,
+                  onTap: () {
+                    themeProvider.setThemeMode(mode);
+                    Navigator.of(context).pop();
                   },
-                ),
-              ),
+                );
+              }),
               const SizedBox(height: 12),
             ],
           ),
         );
       },
     );
+  }
+
+  IconData _themeModeIcon(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return Icons.light_mode_outlined;
+      case ThemeMode.dark:
+        return Icons.dark_mode_outlined;
+      case ThemeMode.system:
+        return Icons.brightness_auto_outlined;
+    }
   }
 
   Future<void> _confirmSignOut(BuildContext context) async {
@@ -506,9 +568,9 @@ class ProfileScreen extends StatelessWidget {
   }
 
   void _openSettings(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
   }
 
   String _resolveDisplayName(User? user) {
@@ -564,9 +626,5 @@ class _StatMetric {
   final int value;
   final IconData icon;
 
-  _StatMetric({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
+  _StatMetric({required this.label, required this.value, required this.icon});
 }
